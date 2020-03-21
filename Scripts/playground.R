@@ -36,9 +36,11 @@ coronavirus %>%
               values_from = total_cases) %>%
   arrange(-confirmed)
 
-# Look at only China
+
+# Look at the total values of a country
+country = 'China'
 coronavirus %>% 
-  filter(Country.Region == 'China') %>%
+  filter(Country.Region == country) %>%
   select(country = Country.Region, type, cases) %>%
   group_by(country, type) %>%
   summarise(total_cases = sum(cases)) %>%
