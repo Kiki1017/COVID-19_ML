@@ -1,6 +1,8 @@
 library(tidyverse)
 library(readxl)
 
+print(getwd())
+
 static_variables_list <- c(
   "CountryCodes",
   # "Overall",
@@ -29,7 +31,7 @@ for(i in 1:length(static_variables_list)){
   }else{
     var_name_with_prefix <- var_name
   }
-  assign(var_name, read_excel("GHSindex_data_static.xlsx", sheet = var_name, col_names = F))
+  assign(var_name, read_excel("./InputData/GHSindex_data_static.xlsx", sheet = var_name, col_names = F))
   if(var_name == "CountryCodes"){
     assign(var_name, eval(parse(text = var_name)) %>% rename("ISO3" = "...1") )
     assign(var_name, eval(parse(text = var_name)) %>% rename("FullName" = "...2") )
