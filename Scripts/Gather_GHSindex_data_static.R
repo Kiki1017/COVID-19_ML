@@ -26,7 +26,7 @@ static_variables_list <- c(
 
 for(i in 1:length(static_variables_list)){
   var_name <- static_variables_list[i]
-  if(var_name %in% c(  "Prevent", "Detect", "Respond", "Health", "Norms", "Risk")){
+  if(var_name %in% c("Overall", "Prevent", "Detect", "Respond", "Health", "Norms", "Risk")){
     var_name_with_prefix <- paste0("GHS_",var_name)
   }else{
     var_name_with_prefix <- var_name
