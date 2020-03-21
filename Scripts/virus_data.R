@@ -70,44 +70,48 @@ create_lag <- function(country_ts, num=10){
   return(country_df)
 }
 
+# function for creating full dataframe 
+create_COVID_ML_df <- function(coronavirus, num_cases_min = 4000, num_lag=10){
+  # aggregate the raw data
+  summary_df <- coronavirus %>%
+    group_by(Country.Region, type) %>%
+    summarise(total_cases = sum(cases)) %>%
+    filter(type=='confirmed') %>%
+    arrange(-total_cases)
+  # filter by minimum number of cases
+  countries_list = summary_df %>%
+    filter(total_cases >= num_cases_min) %>%
+    arrange(-total_cases)
+  # collect ISO3 number
+  countries_training = merge(countries_list, country_codes, by.x='Country.Region', by.y='Country')
+  countries_training <- countries_training %>%
+    arrange(-total_cases)
+  
+  # create the time series data and lag factors
+  df_ts_lag_train <- data.frame()
+  for(i in 1:length(countries_training$ISO3)){
+    df.ts <- country_timeseries(raw_data, countries_training$ISO3[i], plot = F)
+    df.ts.lag <- create_lag(df.ts, num_lag)
+    df.ts.lag$ISO3 <- countries_training$ISO3[i]
+    df.ts.lag$Country <- countries_training$Country.Region[i]
+    df_ts_lag_train <- rbind(df_ts_lag_train,df.ts.lag)
+  }
+  df_ts_lag_train <- select(df_ts_lag_train, date, Country, ISO3, everything())
+  print(paste0("Total number of countries included in analysis are: ", n_distinct(df_ts_lag_train$Country)))
+  # print(paste0("Countries time histories included are: ", distinct(df_ts_lag_train, Country)))
+  print(unique(df_ts_lag_train$Country))
+  return(df_ts_lag_train)
+}
 
-## Testing functions -----
-
-# Select the country of analysis
+## Looking at a single country -----
 
 country_ts <- country_timeseries(raw_data, 'ITA', plot = T) #create time series and plot
 country_ts_lag <- create_lag(country_ts, num=10)
 
 
+## Creaint the full dataframe and saving the .csv file -----
 
+output_df <- create_COVID_ML_df(coronavirus, num_cases_min = 1000, num_lag = 15)
 
-# Select the countries to be considered for analysis:
-num_countries = 10
-summary_df <- coronavirus %>%
-  group_by(Country.Region, type) %>%
-  summarise(total_cases = sum(cases)) %>%
-  filter(type=='confirmed') %>%
-  arrange(-total_cases)
-countries_list = summary_df %>%
-  filter(total_cases >= 4000) %>%
-  arrange(-total_cases)
-
-countries_training = merge(countries_list, country_codes, by.x='Country.Region', by.y='Country')
-countries_training <- countries_training %>%
-  arrange(-total_cases)
-
-
-## Creating dataframe with lag factors for all countries  -----
-df_ts_lag_train <- data.frame()
-for(i in 1:length(countries_training$ISO3)){
-  df.ts <- country_timeseries(raw_data, countries_training$ISO3[i], plot = F)
-  df.ts.lag <- create_lag(df.ts, num=10)
-  df.ts.lag$ISO3 <- countries_training$ISO3[i]
-  df.ts.lag$Country <- countries_training$Country.Region[i]
-  df_ts_lag_train <- rbind(df_ts_lag_train,df.ts.lag)
-}
-
-df_ts_lag_train <- select(df_ts_lag_train, date, Country, everything())
-
-
+write.csv(output_df, file="InputData/data_COVID_2020_03_21.csv")
 
