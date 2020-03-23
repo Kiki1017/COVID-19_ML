@@ -241,4 +241,4 @@ merge_all$FullName[which(merge_all$FullName %ni% unique(Urbanization$FullName))]
 
 merge_all <- merge(merge_all, Urbanization, by.x="FullName", by.y="FullName")
 
-
+write_csv(merge_all, './InputData/data_static_vars.csv')
