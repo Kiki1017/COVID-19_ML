@@ -111,7 +111,7 @@ country_ts_lag <- create_lag(country_ts, num=10)
 
 ## Creaint the full dataframe and saving the .csv file -----
 
-output_df <- create_COVID_ML_df(coronavirus, num_cases_min = 1000, num_lag = 15)
+output_df <- create_COVID_ML_df(coronavirus, num_cases_min = 1000, num_lag = 25)
 
 write.csv(output_df, file="InputData/data_COVID_2020_03_21.csv")
 
