@@ -290,8 +290,33 @@ dim(merge_all)
 
 ###########################################################################################################################################
 # Ethnicity Structure
-house <- read_excel("./InputData/GHSindex_data_static.xlsx", sheet = "EthnicityStructure", col_names = T)
+# https://www.cia.gov/library/publications/resources/the-world-factbook/fields/400.html
+ethnicGroups <- read_excel("./InputData/GHSindex_data_static.xlsx", sheet = "EthnicityStructure", col_names = F)
+colnames(ethnicGroups) <- c("FullName","EthnicityString","Note")
 
-=======
+merge_all$FullName[which(merge_all$FullName %ni% unique(ethnicGroups$FullName))]
+
+ethnicGroups$FullName[ethnicGroups$FullName=="Bahamas, The"] <- "Bahamas"
+ethnicGroups$FullName[ethnicGroups$FullName=="Congo, Republic of the"] <- "Congo (Brazzaville)"
+ethnicGroups$FullName[ethnicGroups$FullName=="Congo, Democratic Republic of the"] <- "Congo (Democratic Republic)"
+ethnicGroups$FullName[ethnicGroups$FullName=="Cote d'Ivoire"] <- "Côte d'Ivoire"
+ethnicGroups$FullName[ethnicGroups$FullName=="Czechia"] <- "Czech Republic"
+ethnicGroups$FullName[ethnicGroups$FullName=="Eswatini"] <- "eSwatini (Swaziland)"
+ethnicGroups$FullName[ethnicGroups$FullName=="Gambia, The"] <- "Gambia"
+ethnicGroups$FullName[ethnicGroups$FullName=="Kyrgyzstan"] <- "Kyrgyz Republic"
+ethnicGroups$FullName[ethnicGroups$FullName=="Micronesia, Federated States of"] <- "Micronesia"
+ethnicGroups$FullName[ethnicGroups$FullName=="Burma"] <- "Myanmar"
+ethnicGroups$FullName[ethnicGroups$FullName=="Korea, North"] <- "North Korea"
+ethnicGroups$FullName[ethnicGroups$FullName=="Macedonia"] <- "North Macedonia"
+ethnicGroups$FullName[ethnicGroups$FullName=="Sao Tome and Principe"] <- "São Tomé and Príncipe"
+ethnicGroups$FullName[ethnicGroups$FullName=="Korea, South"] <- "South Korea"
+ethnicGroups$FullName[ethnicGroups$FullName=="Saint Kitts and Nevis"] <- "St Kitts and Nevis"
+ethnicGroups$FullName[ethnicGroups$FullName=="Saint Lucia"] <- "St Lucia"
+ethnicGroups$FullName[ethnicGroups$FullName=="Saint Vincent and the Grenadines"] <- "St Vincent and The Grenadines"
+
+merge_all$FullName[which(merge_all$FullName %ni% unique(ethnicGroups$FullName))]
+
+
+# =======
 write_csv(merge_all, './InputData/data_static_vars.csv')
->>>>>>> 691d1352b0827c938fde88b108a72978f28df2f6
+# >>>>>>> 691d1352b0827c938fde88b108a72978f28df2f6
