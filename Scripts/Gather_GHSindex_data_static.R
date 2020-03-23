@@ -241,4 +241,53 @@ merge_all$FullName[which(merge_all$FullName %ni% unique(Urbanization$FullName))]
 
 merge_all <- merge(merge_all, Urbanization, by.x="FullName", by.y="FullName")
 
+###########################################################################################################################################
+# Household Structure
+house <- read_excel("./InputData/GHSindex_data_static.xlsx", sheet = "HouseholdStructure", col_names = T)
+
+
+merge_all$Ave_household_size <- NA
+merge_all$Percent_house_Nuclear <- NA
+merge_all$Percent_house_Multi_generation <- NA
+merge_all$Percent_house_Three_generation <- NA
+merge_all$Percent_house_Skip_generation <- NA
+
+merge_all$FullName[which(merge_all$FullName %ni% unique(house$FullName))]
+
+house$FullName[house$FullName=="Bolivia (Plurinational State of)"] <- "Bolivia"
+house$FullName[house$FullName=="Brunei Darussalam"] <- "Brunei"
+house$FullName[house$FullName=="Dem. Republic of the Congo"] <- "Congo (Democratic Republic)"
+house$FullName[house$FullName=="Congo"] <- "Congo (Brazzaville)"
+house$FullName[house$FullName=="Czechia"] <- "Czech Republic"
+house$FullName[house$FullName=="Dominican Republic"] <- "Dominica"
+house$FullName[house$FullName=="Swaziland"] <- "eSwatini (Swaziland)"
+house$FullName[house$FullName=="Kyrgyzstan"] <- "Kyrgyz Republic"
+house$FullName[house$FullName=="Dem. People's Rep. of Korea"] <- "South Korea"
+house$FullName[house$FullName=="Republic of Korea"] <- "North Korea"
+house$FullName[house$FullName=="Russian Federation"] <- "Russia"
+house$FullName[house$FullName=="Sao Tome and Principe"] <- "São Tomé and Príncipe"
+house$FullName[house$FullName=="Saint Kitts and Nevis"] <- "St Kitts and Nevis"
+house$FullName[house$FullName=="United Republic of Tanzania"] <- "Tanzania"
+house$FullName[house$FullName=="United States of America"] <- "United States"
+house$FullName[house$FullName=="Venezuela (Bolivarian Republic of)"] <- "Venezuela"
+house$FullName[house$FullName=="Viet Nam"] <- "Vietnam"
+
+for(i in 1:length(merge_all$FullName)){
+  curName <- house$FullName[i]
+  if(curName %in% house$FullName){
+    cursub <- subset(house, house$FullName==curName)
+    merge_all$Ave_household_size[i] <- as.numeric(cursub$Average_household_size[which(cursub$Date == max(cursub$Date,na.rm=T))])
+    merge_all$Percent_house_Nuclear[i] <- as.numeric(cursub$Nuclear[which(cursub$Date == max(cursub$Date,na.rm=T))])
+    merge_all$Percent_house_Multi_generation[i] <- as.numeric(cursub$Multi_generation[which(cursub$Date == max(cursub$Date,na.rm=T))])
+    merge_all$Percent_house_Three_generation[i] <- as.numeric(cursub$Three_generation[which(cursub$Date == max(cursub$Date,na.rm=T))])
+    merge_all$Percent_house_Skip_generation[i] <- as.numeric(cursub$Skip_generation[which(cursub$Date == max(cursub$Date,na.rm=T))])
+  }
+}
+
+dim(merge_all)
+
+
+###########################################################################################################################################
+# Ethnicity Structure
+house <- read_excel("./InputData/GHSindex_data_static.xlsx", sheet = "EthnicityStructure", col_names = T)
 
