@@ -50,29 +50,29 @@ data_thin <- data_clean %>%
 
 
 # # Look at correlation between predictor variables
-chart.Correlation(data_thin)
-corrplot(cor(data_clean), method="circle", type ="upper")
-featurePlot(x=data_clean[, 1:22],
-            y=data_clean$height,
-            plot = "scatter")
+cormat(data_thin, type="upper")
+
+
+
+corrplot(cor(data_thin), method="color")
+
+# featurePlot(x=select(data_thin, -death),
+#             y=data_thin$death,
+#             plot = "scatter")
 
 # Identifying Correlated Predictors ---------------------------------------
 data.frame(table(data_clean$height))
 
 
-# Look at multicolinearity between variables
-simple_lm <- lm(height ~., data=data_clean)
-vif(simple_lm)
 
-
-# Machine Learning Workflow with Caret -------------------------------------------------------------------
+# Machine Learning Workflow with Caret ------------------------------------
 
 # Randomize data before
 data_rand <- data_clean[sample(1:nrow(data_clean)), ]
 
 # Select training and test data
-X = data_rand[, -which( colnames(data_rand)=="height")]
-y = data_clean[, which( colnames(data_rand)=="height")]
+X = data_rand[, -which( colnames(data_rand)=="death")]
+y = data_clean[, which( colnames(data_rand)=="death")]
 
 # Check data
 str(X)
