@@ -37,115 +37,42 @@ start_time = Sys.time()
 # Import data -------------------------------------------------------------------
 set.seed(40)
 
-# Data from python data wrangling. Different datasets have different number of data points.
-data_raw <- read.csv("~/Input Data/Footprint_Training_Clean.csv")
-# data_raw <- read.csv("~/Input Data/Footprint_Training_Clean_medium.csv")
-# data_raw <- read.csv("~/Input Data/Footprint_Training_Clean_all.csv")
-data_clean = sample_n(data_raw, size=10000)
-data_clean$X = NULL
-data_clean$OBJECTID = NULL
-data_clean$centroid_lat = NULL
-data_clean$centroid_long = NULL
-data_clean$perimeter = NULL
-data_clean$area = NULL
-data_clean$mbr_area = NULL
-data_clean$mbr_perimeter = NULL
-data_clean$n_vertices = as.numeric(data_clean$n_vertices)
-colnames(data_clean)[1] <- ('perimeter')
-colnames(data_clean)[2] <- c('area')
-colnames(data_clean)[12] <- c('mbr_perimeter')
-colnames(data_clean)[11] <- c('mbr_area')
-colnames(data_clean)[5] <- c('radius_mean')
-
-
-
-# Create New Variables -------------------------------------------------------------------
-data_clean = data_clean %>%
-  mutate(Cooke_JC = perimeter / (4*sqrt(area)) - 1) %>%
-  mutate(POP_index = 2*sqrt(pi*area) / (perimeter)) %>%
-  mutate(Compactness = (4*pi*area) / perimeter^2) %>%
-  mutate(fractality = 1 - log(area)/(2*log(perimeter))) %>%
-  mutate(elongation = pmax(mbr_length, mbr_width) / pmin(mbr_length, mbr_width)) %>%
-  mutate(concavity = area / convex_hull_area) %>%
-  select(-height,height)
+data_clean <- read.csv("./InputData/ML_features.csv")
 
 
 # Looking at the data
 glimpse(data_clean)
 summary(data_clean)
 
-# Height to Num Stories -------------------------------------------------------------------
-interstory_height = 3.5 #meters
-data_clean = data_clean %>%
-  mutate(no_floors = round(height/interstory_height))
-
-plt1 <- ggplot(data=data_clean) +
-  geom_histogram(mapping=aes(x=no_floors), bins=100, fill = "lightblue", color = "black") +
-  ylab("Count") +
-  xlim(0,10) +
-  ggtitle("Interstory Height = 3.5 meters") +
-  theme_classic()
-
-plt2 <- ggplot(data=data_clean, aes(x="",y=no_floors )) +
-  geom_boxplot(fill = "lightblue", color = "black") +
-  coord_flip() +
-  theme_classic() +
-  xlab("") +
-  ylim(0,10) +
-  theme(axis.text.y=element_blank(),
-        axis.ticks.y=element_blank())
-
-egg::ggarrange(plt1, plt2, heights = 2:1)
-
-
-
-
-# Variable to plot:
-
-# Plotting
-# plt1 <- ggplot(data=data_clean) +
-#   geom_histogram(mapping=aes(x=perimeter), bins=100, fill = "lightblue", color = "black") +
-#   ylab("Count") +
-#   # xlim(0,20) +
-#   theme_classic()
-# 
-# plt2 <- ggplot(data=data_clean, aes(x="",y=perimeter )) +
-#   geom_boxplot(fill = "lightblue", color = "black") +
-#   coord_flip() +
-#   theme_classic() +
-#   xlab("") +
-#   # ylim(0,20) +
-#   theme(axis.text.y=element_blank(),
-#         axis.ticks.y=element_blank())
-# 
-# egg::ggarrange(plt1, plt2, heights = 2:1)
+# Drop variables not considered
+data_thin <- data_clean %>%
+  select(-date,-Country,-ISO3,-FullName)
 
 
 # # Look at correlation between predictor variables
-chart.Correlation(data_clean)
-corrplot(cor(data_clean), method="circle", type ="upper")
-featurePlot(x=data_clean[, 1:22],
-            y=data_clean$height,
-            plot = "scatter",
-)
+cormat(data_thin, type="upper")
+
+
+
+corrplot(cor(data_thin), method="color")
+
+# featurePlot(x=select(data_thin, -death),
+#             y=data_thin$death,
+#             plot = "scatter")
 
 # Identifying Correlated Predictors ---------------------------------------
 data.frame(table(data_clean$height))
 
 
-# Look at multicolinearity between variables
-simple_lm <- lm(height ~., data=data_clean)
-vif(simple_lm)
 
-
-# Machine Learning Workflow with Caret -------------------------------------------------------------------
+# Machine Learning Workflow with Caret ------------------------------------
 
 # Randomize data before
 data_rand <- data_clean[sample(1:nrow(data_clean)), ]
 
 # Select training and test data
-X = data_rand[, -which( colnames(data_rand)=="height")]
-y = data_clean[, which( colnames(data_rand)=="height")]
+X = data_rand[, -which( colnames(data_rand)=="death")]
+y = data_clean[, which( colnames(data_rand)=="death")]
 
 # Check data
 str(X)

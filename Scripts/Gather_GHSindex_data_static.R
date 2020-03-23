@@ -241,6 +241,7 @@ merge_all$FullName[which(merge_all$FullName %ni% unique(Urbanization$FullName))]
 
 merge_all <- merge(merge_all, Urbanization, by.x="FullName", by.y="FullName")
 
+<<<<<<< HEAD
 ###########################################################################################################################################
 # Household Structure
 house <- read_excel("./InputData/GHSindex_data_static.xlsx", sheet = "HouseholdStructure", col_names = T)
@@ -291,3 +292,6 @@ dim(merge_all)
 # Ethnicity Structure
 house <- read_excel("./InputData/GHSindex_data_static.xlsx", sheet = "EthnicityStructure", col_names = T)
 
+=======
+write_csv(merge_all, './InputData/data_static_vars.csv')
+>>>>>>> 691d1352b0827c938fde88b108a72978f28df2f6
