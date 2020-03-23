@@ -13,12 +13,12 @@
 
 # Import packages
 library(ggplot2)
-library(reshape2)
-library(egg)
+# library(reshape2)
+# library(egg)
 library(tidyverse)
 library(dplyr)
 library(tidyr)
-library(rgdal)
+# library(rgdal)
 library(caret)
 library(GGally)
 library(randomForest)
@@ -68,10 +68,10 @@ data.frame(table(data_clean$height))
 # Machine Learning Workflow with Caret ------------------------------------
 
 # Randomize data before
-data_rand <- data_clean[sample(1:nrow(data_clean)), ]
+
 
 # Select training and test data
-X = data_rand[, -which( colnames(data_rand)=="death")]
+X = filter(data_thin, date > 15)
 y = data_clean[, which( colnames(data_rand)=="death")]
 
 # Check data
