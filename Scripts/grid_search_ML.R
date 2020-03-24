@@ -38,64 +38,139 @@ start_time = Sys.time()
 set.seed(40)
 
 data_clean <- read.csv("./InputData/ML_features.csv")
+data_clean$date <- as.Date(data_clean$date)
 
 
 # Looking at the data
 glimpse(data_clean)
 summary(data_clean)
 
-# Drop variables not considered
+# Drop variables not considered 
 data_thin <- data_clean %>%
-  select(-date,-Country,-ISO3,-FullName)
+  select(-ISO3, -Country,-FullName) %>%
+  # remove number of confirmed cases
+<<<<<<< HEAD
+<<<<<<< HEAD
+  select(-contains("recovered")) %>%
+  select(-contains("lag")) %>%
+  select(-FullName)
+=======
+  select(-contains("recovered"))
+>>>>>>> 0123a27d7c26f931572a48a0ffdaf58e9db70073
+=======
+  select(-contains("recovered"))
+>>>>>>> 0123a27d7c26f931572a48a0ffdaf58e9db70073
+  
 
 
 # # Look at correlation between predictor variables
-cormat(data_thin, type="upper")
-
-
-
-corrplot(cor(data_thin), method="color")
-
+# cormat(data_thin, type="upper")
+# corrplot(cor(data_thin), method="color")
 # featurePlot(x=select(data_thin, -death),
 #             y=data_thin$death,
 #             plot = "scatter")
 
-# Identifying Correlated Predictors ---------------------------------------
-data.frame(table(data_clean$height))
-
-
-
 # Machine Learning Workflow with Caret ------------------------------------
 
-# Randomize data before
+# Input number of days for training / testing split
+days <- 7
+split_date <- max(data_clean$date) - days
+<<<<<<< HEAD
+
+#### creating sampling seeds ####
+set.seed(123)
+seeds <- vector(mode = "list", length = 432)
+for(i in 1:431) seeds[[i]] <- sample.int(1000, 5)
+=======
+>>>>>>> 0123a27d7c26f931572a48a0ffdaf58e9db70073
+
+<<<<<<< HEAD
+## For the last model:
+seeds[[432]] <- sample.int(1000, 1)
+
+registerDoParallel(8)
+getDoParWorkers()
+myTimeControl <- trainControl(method = "timeslice",
+                              initialWindow = 7,
+                              horizon = 5,
+                              fixedWindow = FALSE,
+                              allowParallel = TRUE)
+                              # seeds = seeds)
+tuneLength.num <- 5
+
+glmnet.mod <- train(death ~ . -date,
+                    data = data_thin,
+                    method = "glmnet",
+                    family = "gaussian",
+                    trControl = myTimeControl,
+                    tuneLength=tuneLength.num,
+                    na.action=na.exclude)
+pois.mod <- train(death ~ . - date,
+                  data = data_thin,
+                  method = "glmnet",
+                  family = "poisson",
+                  trControl = myTimeControl,
+                  tuneLength=tuneLength.num,
+                  na.action=na.exclude)
+lm.mod <- train(death ~ . - date,
+                data = data_thin,
+                method = "lm",
+                trControl = myTimeControl,
+                tuneLength=tuneLength.num,
+                na.action=na.exclude)
+rf.mod <- train(death ~ . - date,
+                data = data_thin,
+                method = "rf",
+                trControl = myTimeControl,
+                tuneLength=tuneLength.num,
+                na.action=na.exclude)
 
 
+resamps <- resamples(list(glmnet = glmnet.mod,
+                          glmnet.pois = pois.mod,
+                          lm = lm.mod,
+                          rf=rf.mod))
+resamps
+
+ss <- summary(resamps)
+
+
+trellis.par.set(caretTheme())
+dotplot(resamps, metric = "Rsquared")
+
+=======
 # Select training and test data
-X = filter(data_thin, date > 15)
-y = data_clean[, which( colnames(data_rand)=="death")]
+X = data_thin %>%
+  select(-death,-confirmed,-confirmed_cum,-death_cum)
+  # select(-contains("recovered"))
+y = data_thin %>%
+  select(date,death)
 
 # Check data
 str(X)
 str(y)
 
 # Create training and test data
-set.seed(31)
-part.index <- createDataPartition(data_rand$height, 
-                                  p = 0.75,                         
-                                  list = FALSE)
+X_train <- filter(X, date <= split_date)
+X_test  <- filter(X, date >  split_date)
+y_train <- filter(y, date <= split_date)
+y_test  <- filter(y, date >  split_date)
 
-X_train <- X[part.index, ]
-X_test <- X[-part.index, ]
-y_train <- y[part.index]
-y_test <- y[-part.index]
+# Remove date as a predictor variable
+X_train <- select(X_train, -date)
+X_test  <- select(X_test, -date)
+y_train <- select(y_train, -date)
+y_test  <- select(y_test, -date)
+<<<<<<< HEAD
+>>>>>>> 0123a27d7c26f931572a48a0ffdaf58e9db70073
+=======
+>>>>>>> 0123a27d7c26f931572a48a0ffdaf58e9db70073
 
-str(X_train)
-str(X_test)
-str(y_train)
-str(y_test)
 
+<<<<<<< HEAD
+=======
 # Set up parallel processing with number of cross validations (cv)
-registerDoParallel(8)
+registerDoParallel(4)
 getDoParWorkers()
 set.seed(123)
 my_control <- trainControl(method = "cv",
@@ -108,7 +183,7 @@ set.seed(222)
 model_list <- caretList(X_train,
                         y_train,
                         trControl = my_control,
-                        methodList = c("lm", "svmRadial"),
+                        methodList = c("lm", "rf"),
                         tuneList = NULL,
                         continue_on_fail = FALSE, 
                         preProcess = c("center","scale"))
@@ -191,3 +266,4 @@ end_time <- Sys.time()
 total_time = end_time - start_time
 print(total_time)
 pbPost("note", "AWS R session completed!", "Check dat thang out boiiii.")
+>>>>>>> 0123a27d7c26f931572a48a0ffdaf58e9db70073
