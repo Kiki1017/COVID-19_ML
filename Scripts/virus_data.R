@@ -116,7 +116,11 @@ country_ts_lag <- create_lag(country_ts, num=10)
 output_df <- create_COVID_ML_df(coronavirus, num_cases_min = 1000, num_lag = 10)
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 write.csv(output_df, file="InputData/data_COVID_2020_03_24.csv")
+=======
+write.csv(output_df, file="InputData/data_COVID_2020_03_23.csv")
+>>>>>>> 0123a27d7c26f931572a48a0ffdaf58e9db70073
 =======
 write.csv(output_df, file="InputData/data_COVID_2020_03_23.csv")
 >>>>>>> 0123a27d7c26f931572a48a0ffdaf58e9db70073

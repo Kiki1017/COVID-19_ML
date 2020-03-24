@@ -50,9 +50,13 @@ data_thin <- data_clean %>%
   select(-ISO3, -Country,-FullName) %>%
   # remove number of confirmed cases
 <<<<<<< HEAD
+<<<<<<< HEAD
   select(-contains("recovered")) %>%
   select(-contains("lag")) %>%
   select(-FullName)
+=======
+  select(-contains("recovered"))
+>>>>>>> 0123a27d7c26f931572a48a0ffdaf58e9db70073
 =======
   select(-contains("recovered"))
 >>>>>>> 0123a27d7c26f931572a48a0ffdaf58e9db70073
@@ -71,11 +75,14 @@ data_thin <- data_clean %>%
 # Input number of days for training / testing split
 days <- 7
 split_date <- max(data_clean$date) - days
+<<<<<<< HEAD
 
 #### creating sampling seeds ####
 set.seed(123)
 seeds <- vector(mode = "list", length = 432)
 for(i in 1:431) seeds[[i]] <- sample.int(1000, 5)
+=======
+>>>>>>> 0123a27d7c26f931572a48a0ffdaf58e9db70073
 
 <<<<<<< HEAD
 ## For the last model:
@@ -154,6 +161,9 @@ X_train <- select(X_train, -date)
 X_test  <- select(X_test, -date)
 y_train <- select(y_train, -date)
 y_test  <- select(y_test, -date)
+<<<<<<< HEAD
+>>>>>>> 0123a27d7c26f931572a48a0ffdaf58e9db70073
+=======
 >>>>>>> 0123a27d7c26f931572a48a0ffdaf58e9db70073
 
 

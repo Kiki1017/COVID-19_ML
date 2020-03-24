@@ -16,7 +16,11 @@ library(tidyr)
 
 # Load in raw data
 <<<<<<< HEAD:Scripts/data_cleaning.R
+<<<<<<< HEAD:Scripts/data_cleaning.R
 raw_data_COVID <- read.csv('./InputData/data_COVID_2020_03_24.csv')
+=======
+raw_data_COVID <- read.csv('./InputData/data_COVID_2020_03_23.csv')
+>>>>>>> 0123a27d7c26f931572a48a0ffdaf58e9db70073:Scripts/data_cleaning.R
 =======
 raw_data_COVID <- read.csv('./InputData/data_COVID_2020_03_23.csv')
 >>>>>>> 0123a27d7c26f931572a48a0ffdaf58e9db70073:Scripts/data_cleaning.R
