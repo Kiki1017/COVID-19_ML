@@ -49,9 +49,13 @@ summary(data_clean)
 data_thin <- data_clean %>%
   select(-ISO3, -Country,-FullName) %>%
   # remove number of confirmed cases
+<<<<<<< HEAD
   select(-contains("recovered")) %>%
   select(-contains("lag")) %>%
   select(-FullName)
+=======
+  select(-contains("recovered"))
+>>>>>>> 0123a27d7c26f931572a48a0ffdaf58e9db70073
   
 
 
