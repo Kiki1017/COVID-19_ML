@@ -38,156 +38,93 @@ start_time = Sys.time()
 set.seed(40)
 
 data_clean <- read.csv("./InputData/ML_features.csv")
+data_clean$date <- as.Date(data_clean$date)
 
 
 # Looking at the data
 glimpse(data_clean)
 summary(data_clean)
 
-# Drop variables not considered
+# Drop variables not considered 
 data_thin <- data_clean %>%
-  select(-date,-Country,-ISO3,-FullName)
+  select(-ISO3, -Country,-FullName) %>%
+  # remove number of confirmed cases
+  select(-contains("recovered")) %>%
+  select(-contains("lag")) %>%
+  select(-FullName)
+  
 
 
 # # Look at correlation between predictor variables
-cormat(data_thin, type="upper")
-
-
-
-corrplot(cor(data_thin), method="color")
-
+# cormat(data_thin, type="upper")
+# corrplot(cor(data_thin), method="color")
 # featurePlot(x=select(data_thin, -death),
 #             y=data_thin$death,
 #             plot = "scatter")
 
-# Identifying Correlated Predictors ---------------------------------------
-data.frame(table(data_clean$height))
-
-
-
 # Machine Learning Workflow with Caret ------------------------------------
 
-# Randomize data before
+# Input number of days for training / testing split
+days <- 7
+split_date <- max(data_clean$date) - days
 
+#### creating sampling seeds ####
+set.seed(123)
+seeds <- vector(mode = "list", length = 432)
+for(i in 1:431) seeds[[i]] <- sample.int(1000, 5)
 
-# Select training and test data
-X = filter(data_thin, date > 15)
-y = data_clean[, which( colnames(data_rand)=="death")]
+## For the last model:
+seeds[[432]] <- sample.int(1000, 1)
 
-# Check data
-str(X)
-str(y)
-
-# Create training and test data
-set.seed(31)
-part.index <- createDataPartition(data_rand$height, 
-                                  p = 0.75,                         
-                                  list = FALSE)
-
-X_train <- X[part.index, ]
-X_test <- X[-part.index, ]
-y_train <- y[part.index]
-y_test <- y[-part.index]
-
-str(X_train)
-str(X_test)
-str(y_train)
-str(y_test)
-
-# Set up parallel processing with number of cross validations (cv)
 registerDoParallel(8)
 getDoParWorkers()
-set.seed(123)
-my_control <- trainControl(method = "cv",
-                           number = 3,
-                           savePredictions = "final",
-                           allowParallel = TRUE)
+myTimeControl <- trainControl(method = "timeslice",
+                              initialWindow = 7,
+                              horizon = 5,
+                              fixedWindow = FALSE,
+                              allowParallel = TRUE)
+                              # seeds = seeds)
+tuneLength.num <- 5
 
-# Train models!
-set.seed(222)
-model_list <- caretList(X_train,
-                        y_train,
-                        trControl = my_control,
-                        methodList = c("lm", "svmRadial"),
-                        tuneList = NULL,
-                        continue_on_fail = FALSE, 
-                        preProcess = c("center","scale"))
-pbPost("note", "Model Training completed!", "")
-
-
-# Print model results (RMSE)
-options(digits = 3)
-model_results <- data.frame(
-  LM = min(model_list$lm$results$RMSE),
-  SVM = min(model_list$svmRadial$results$RMSE)
-  # RF = min(model_list$rf$results$RMSE)
-  # XGBT = min(model_list$xgbTree$results$RMSE)
-  # XGBL = min(model_list$xgbLinear$results$RMSE)
-)
-print(model_results)
-
-
-# Resample model to evaluate confidence levels for each
-resamples <- resamples(model_list)
-dotplot(resamples, metric = "RMSE")
-
-# What is the corellation of models?
-modelCor(resamples)
+glmnet.mod <- train(death ~ . -date,
+                    data = data_thin,
+                    method = "glmnet",
+                    family = "gaussian",
+                    trControl = myTimeControl,
+                    tuneLength=tuneLength.num,
+                    na.action=na.exclude)
+pois.mod <- train(death ~ . - date,
+                  data = data_thin,
+                  method = "glmnet",
+                  family = "poisson",
+                  trControl = myTimeControl,
+                  tuneLength=tuneLength.num,
+                  na.action=na.exclude)
+lm.mod <- train(death ~ . - date,
+                data = data_thin,
+                method = "lm",
+                trControl = myTimeControl,
+                tuneLength=tuneLength.num,
+                na.action=na.exclude)
+rf.mod <- train(death ~ . - date,
+                data = data_thin,
+                method = "rf",
+                trControl = myTimeControl,
+                tuneLength=tuneLength.num,
+                na.action=na.exclude)
 
 
-# # Combine models (using ensemble) to create another model
-# set.seed(222)
-# ensemble_1 <- caretEnsemble(model_list, 
-#                             metric = "RMSE", 
-#                             trControl = my_control)
-# summary(ensemble_1)
-# plot(ensemble_1)
-# 
-# 
-# # Stack models to create another
-# set.seed(222)
-# ensemble_2 <- caretStack(model_list, 
-#                          method = "glm", 
-#                          metric = "RMSE", 
-#                          trControl = my_control)
-# print(ensemble_2)
+resamps <- resamples(list(glmnet = glmnet.mod,
+                          glmnet.pois = pois.mod,
+                          lm = lm.mod,
+                          rf=rf.mod))
+resamps
+
+ss <- summary(resamps)
 
 
-# Test data performance with models
-# PREDICTIONS
-pred_lm <- predict.train(model_list$lm, newdata = X_test)
-pred_svm <- predict.train(model_list$svmRadial, newdata = X_test)
-# pred_rf <- predict.train(model_list$rf, newdata = X_test)
-# pred_xgbT <- predict.train(model_list$xgbTree, newdata = X_test)
-# pred_xgbL <- predict.train(model_list$xgbLinear, newdata = X_test)
-# predict_ens1 <- predict(ensemble_1, newdata = X_test)
-# predict_ens2 <- predict(ensemble_2, newdata = X_test)
+trellis.par.set(caretTheme())
+dotplot(resamps, metric = "Rsquared")
 
-# RMSE
-pred_RMSE <- data.frame(
-  # ensemble_1 = RMSE(predict_ens1, y_test),
-  # ensemble_2 = RMSE(predict_ens2, y_test),
-  LM = RMSE(pred_lm, y_test),
-  SVM = RMSE(pred_svm, y_test)
-  # RF = RMSE(pred_rf, y_test),
-  # XGBT = RMSE(pred_xgbT, y_test),
-  # XGBL = RMSE(pred_xgbL, y_test)
-)
-print(pred_RMSE)
 
-# xgbTree_model <- train(X_train,
-#                        y_train,
-#                        trControl = my_control,
-#                        method = "xgbLinear",
-#                        metric = "RMSE",
-#                        preProcess = c("center","scale"),
-#                        importance = TRUE)
-# plot(varImp(xgbTree_model))
 
-# save.image(file='Jan07_2020_Workspace')
-
-end_time <- Sys.time()
-
-total_time = end_time - start_time
-print(total_time)
-pbPost("note", "AWS R session completed!", "Check dat thang out boiiii.")

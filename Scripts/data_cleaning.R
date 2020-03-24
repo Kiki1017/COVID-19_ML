@@ -15,7 +15,7 @@ library(dplyr)
 library(tidyr)
 
 # Load in raw data
-raw_data_COVID <- read.csv('./InputData/data_COVID_2020_03_22.csv')
+raw_data_COVID <- read.csv('./InputData/data_COVID_2020_03_24.csv')
 raw_data_static <- read.csv('./InputData/data_static_vars.csv')
 
 # Manipulate original datasets (e.g., normalizing)

@@ -35,8 +35,8 @@ country_timeseries <- function(df, country, plot=F){
                 values_from = daily_cases) %>%
     ungroup() %>%
     mutate(confirmed_cum = cumsum(confirmed)) %>%
-    mutate(death_cum = cumsum(death)) %>%
-    mutate(recovered_cum = cumsum(recovered))
+    mutate(death_cum = cumsum(death)) #%>%
+    # mutate(recovered_cum = cumsum(recovered))
   if(plot==T){
     # Plot cummulative sum of cases
     p1 <- ggplot(output, aes(x=date, y=confirmed_cum)) +
@@ -57,15 +57,17 @@ country_timeseries <- function(df, country, plot=F){
 create_lag <- function(country_ts, num=10){
   # creating lag variables for number of reported cases, deaths, and recovered
   lags <- seq(num)   # set the number of lag factors here
-  lag_names <- paste("confirmed_cum_lag", formatC(lags, width = nchar(max(lags)), flag = "0"), 
+  lag_names <- paste("cum_lag", formatC(lags, width = nchar(max(lags)), flag = "0"), 
                      sep = "_")
   lag_functions <- setNames(paste("dplyr::lag(., ", lags, ")"), lag_names)
   
   if(dim(country_ts)[2] > 7){
-    country_df <- country_ts %>% mutate_at(vars(confirmed, death, recovered), funs_(lag_functions)) %>%
-      select(-values1_lag1, -values1_lag2, -values2_lag1, -values2_lag2)
+    # country_df <- country_ts %>% mutate_at(vars(confirmed, death, recovered), funs_(lag_functions)) %>%
+    country_df <- country_ts %>% mutate_at(vars(confirmed, death), funs_(lag_functions)) %>%
+    select(-values1_lag1, -values1_lag2, -values2_lag1, -values2_lag2)
   }else{
-    country_df <- country_ts %>% mutate_at(vars(confirmed, death, recovered), funs_(lag_functions))
+    # country_df <- country_ts %>% mutate_at(vars(confirmed, death, recovered), funs_(lag_functions))
+    country_df <- country_ts %>% mutate_at(vars(confirmed, death), funs_(lag_functions))
   }
   return(country_df)
 }
@@ -111,7 +113,7 @@ country_ts_lag <- create_lag(country_ts, num=10)
 
 ## Creaint the full dataframe and saving the .csv file -----
 
-output_df <- create_COVID_ML_df(coronavirus, num_cases_min = 1000, num_lag = 25)
+output_df <- create_COVID_ML_df(coronavirus, num_cases_min = 1000, num_lag = 10)
 
-write.csv(output_df, file="InputData/data_COVID_2020_03_21.csv")
+write.csv(output_df, file="InputData/data_COVID_2020_03_24.csv")
 
