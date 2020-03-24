@@ -23,7 +23,16 @@ testing_full$N_cases_lag1 <- as.numeric(testing_full$N_cases_lag1)
 testing_full$N_cases_lag2 <- as.numeric(testing_full$N_cases_lag2)
 str(testing_full)
 
-fit <- rpart(N_cases ~ time+N_cases_lag1+N_cases_lag2+aged_less_65+degree_isolation+health_preparedness1+health_preparedness2, data=training, method="class",control=rpart.control(minsplit=2, cp=0.001)) 
+fit <- rpart(N_cases ~ time+
+               N_cases_lag1+
+               N_cases_lag2+
+               aged_less_65+
+               degree_isolation+
+               health_preparedness1+
+               health_preparedness2, 
+             data=training, 
+             method="anova", #"anova", "poisson", "class" or "exp"
+             control=rpart.control(minsplit=5, cp=0.001)) 
 summary(fit)
 plot(fit)
 text(fit)
