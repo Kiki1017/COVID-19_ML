@@ -241,6 +241,7 @@ merge_all$FullName[which(merge_all$FullName %ni% unique(Urbanization$FullName))]
 
 merge_all <- merge(merge_all, Urbanization, by.x="FullName", by.y="FullName")
 
+<<<<<<< HEAD
 ###########################################################################################################################################
 # Household Structure
 house <- read_excel("./InputData/GHSindex_data_static.xlsx", sheet = "HouseholdStructure", col_names = T)
@@ -286,73 +287,34 @@ for(i in 1:length(merge_all$FullName)){
 
 dim(merge_all)
 
+
 ###########################################################################################################################################
 # Ethnicity Structure
 # https://www.cia.gov/library/publications/resources/the-world-factbook/fields/400.html
-ethnicGroups <- read_excel("./InputData/GHSindex_data_static.xlsx", sheet = "EFindex", col_names = T)
-colnames(ethnicGroups) <- c("FullName","Year","EFindex")
+ethnicGroups <- read_excel("./InputData/GHSindex_data_static.xlsx", sheet = "EthnicityStructure", col_names = F)
+colnames(ethnicGroups) <- c("FullName","EthnicityString","Note")
 
 merge_all$FullName[which(merge_all$FullName %ni% unique(ethnicGroups$FullName))]
 
-ethnicGroups$FullName[ethnicGroups$FullName=="Bosnia-Herzegovina"] <- "Bosnia and Herzegovina"
-ethnicGroups$FullName[ethnicGroups$FullName=="Cape Verde"] <- "Cabo Verde"
-ethnicGroups$FullName[ethnicGroups$FullName=="Congo"] <- "Congo (Brazzaville)"
-ethnicGroups$FullName[ethnicGroups$FullName=="Democratic Republic of Congo"] <- "Congo (Democratic Republic)"
+ethnicGroups$FullName[ethnicGroups$FullName=="Bahamas, The"] <- "Bahamas"
+ethnicGroups$FullName[ethnicGroups$FullName=="Congo, Republic of the"] <- "Congo (Brazzaville)"
+ethnicGroups$FullName[ethnicGroups$FullName=="Congo, Democratic Republic of the"] <- "Congo (Democratic Republic)"
 ethnicGroups$FullName[ethnicGroups$FullName=="Cote d'Ivoire"] <- "Côte d'Ivoire"
-ethnicGroups$FullName[ethnicGroups$FullName=="Dominican Republic"] <- "Dominica"
-ethnicGroups$FullName[ethnicGroups$FullName=="Swaziland"] <- "eSwatini (Swaziland)"
-ethnicGroups$FullName[ethnicGroups$FullName=="German Federal Republic"] <- "Germany"
-ethnicGroups$FullName[ethnicGroups$FullName=="Democratic People's Republic of Korea"] <- "South Korea"
-ethnicGroups$FullName[ethnicGroups$FullName=="Republic of Korea"] <- "North Korea"
+ethnicGroups$FullName[ethnicGroups$FullName=="Czechia"] <- "Czech Republic"
+ethnicGroups$FullName[ethnicGroups$FullName=="Eswatini"] <- "eSwatini (Swaziland)"
+ethnicGroups$FullName[ethnicGroups$FullName=="Gambia, The"] <- "Gambia"
+ethnicGroups$FullName[ethnicGroups$FullName=="Kyrgyzstan"] <- "Kyrgyz Republic"
+ethnicGroups$FullName[ethnicGroups$FullName=="Micronesia, Federated States of"] <- "Micronesia"
+ethnicGroups$FullName[ethnicGroups$FullName=="Burma"] <- "Myanmar"
+ethnicGroups$FullName[ethnicGroups$FullName=="Korea, North"] <- "North Korea"
 ethnicGroups$FullName[ethnicGroups$FullName=="Macedonia"] <- "North Macedonia"
-# ethnicGroups$FullName[ethnicGroups$FullName=="Sudan"] <- "South Sudan"
-ethnicGroups$FullName[ethnicGroups$FullName=="East Timor"] <- "Timor-Leste"
-ethnicGroups$FullName[ethnicGroups$FullName=="United States of America"] <- "United States"
-ethnicGroups$FullName[ethnicGroups$FullName=="Democratic Republic of Vietnam"] <- "Vietnam"
-ethnicGroups$FullName[ethnicGroups$FullName=="Yemen Arab Republic"] <- "Yemen"
+ethnicGroups$FullName[ethnicGroups$FullName=="Sao Tome and Principe"] <- "São Tomé and Príncipe"
+ethnicGroups$FullName[ethnicGroups$FullName=="Korea, South"] <- "South Korea"
+ethnicGroups$FullName[ethnicGroups$FullName=="Saint Kitts and Nevis"] <- "St Kitts and Nevis"
+ethnicGroups$FullName[ethnicGroups$FullName=="Saint Lucia"] <- "St Lucia"
+ethnicGroups$FullName[ethnicGroups$FullName=="Saint Vincent and the Grenadines"] <- "St Vincent and The Grenadines"
 
 merge_all$FullName[which(merge_all$FullName %ni% unique(ethnicGroups$FullName))]
-
-merge_all$EFindex <- NA
-
-for(i in 1:length(merge_all$FullName)){
-  curName <- merge_all$FullName[i]
-  if(curName %in% ethnicGroups$FullName){
-    cursub <- subset(ethnicGroups, ethnicGroups$FullName==curName)
-    merge_all$EFindex[i] <- as.numeric(cursub$EFindex[which(cursub$Year == max(cursub$Year,na.rm=T))])
-    print(max(cursub$Year,na.rm=T))
-  }else{
-    merge_all$EFindex[i] <- NA
-  }
-}
-
-###########################################################################################################################################
-# Ethnicity Structure
-# https://www.cia.gov/library/publications/resources/the-world-factbook/fields/400.html
-# ethnicGroups <- read_excel("./InputData/GHSindex_data_static.xlsx", sheet = "EthnicityStructure", col_names = F)
-# colnames(ethnicGroups) <- c("FullName","EthnicityString","Note")
-# 
-# merge_all$FullName[which(merge_all$FullName %ni% unique(ethnicGroups$FullName))]
-# 
-# ethnicGroups$FullName[ethnicGroups$FullName=="Bahamas, The"] <- "Bahamas"
-# ethnicGroups$FullName[ethnicGroups$FullName=="Congo, Republic of the"] <- "Congo (Brazzaville)"
-# ethnicGroups$FullName[ethnicGroups$FullName=="Congo, Democratic Republic of the"] <- "Congo (Democratic Republic)"
-# ethnicGroups$FullName[ethnicGroups$FullName=="Cote d'Ivoire"] <- "Côte d'Ivoire"
-# ethnicGroups$FullName[ethnicGroups$FullName=="Czechia"] <- "Czech Republic"
-# ethnicGroups$FullName[ethnicGroups$FullName=="Eswatini"] <- "eSwatini (Swaziland)"
-# ethnicGroups$FullName[ethnicGroups$FullName=="Gambia, The"] <- "Gambia"
-# ethnicGroups$FullName[ethnicGroups$FullName=="Kyrgyzstan"] <- "Kyrgyz Republic"
-# ethnicGroups$FullName[ethnicGroups$FullName=="Micronesia, Federated States of"] <- "Micronesia"
-# ethnicGroups$FullName[ethnicGroups$FullName=="Burma"] <- "Myanmar"
-# ethnicGroups$FullName[ethnicGroups$FullName=="Korea, North"] <- "North Korea"
-# ethnicGroups$FullName[ethnicGroups$FullName=="Macedonia"] <- "North Macedonia"
-# ethnicGroups$FullName[ethnicGroups$FullName=="Sao Tome and Principe"] <- "São Tomé and Príncipe"
-# ethnicGroups$FullName[ethnicGroups$FullName=="Korea, South"] <- "South Korea"
-# ethnicGroups$FullName[ethnicGroups$FullName=="Saint Kitts and Nevis"] <- "St Kitts and Nevis"
-# ethnicGroups$FullName[ethnicGroups$FullName=="Saint Lucia"] <- "St Lucia"
-# ethnicGroups$FullName[ethnicGroups$FullName=="Saint Vincent and the Grenadines"] <- "St Vincent and The Grenadines"
-# 
-# merge_all$FullName[which(merge_all$FullName %ni% unique(ethnicGroups$FullName))]
 
 
 # =======
