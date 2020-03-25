@@ -16,11 +16,12 @@ glimpse(data_clean)
 summary(data_clean)
 
 # make country lists
-training_countries <- c("CHN","KOR","ITA")
+training_countries <- c("CHN","KOR","ITA","ESP")
 testing_countries <- c("USA")
 # testing_countries <- c("GBR")
 # testing_countries <- c("AUS")
 # testing_countries <- c("BRA")
+
 
 # subset to 100 cumulative cases as starting time threshold and add time column
 for(i in 1:length(training_countries)){
@@ -56,6 +57,27 @@ for(i in 1:length(testing_countries)){
     testing_ready <- as.data.frame(rbind(testing_ready,testing_subset_aligned_predictNA))
   }
 }
+
+##########################################################################################################################################################################
+lineColors <- c("firebrick","darkgoldenrod1", "darkviolet", "limegreen", "dodgerblue")
+ggplot() +
+  geom_line(data=training_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size=0.8,alpha=.7)+
+  geom_line(data=testing_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1)+
+  labs(x="Days Since 100 Cumulative Counts", y = "Confirmed Cumulative Cases", title="") +
+  guides(color=guide_legend(title="")) +
+  theme(legend.title=element_text(size=18))+
+  theme(axis.text.x = element_text(color="black",size = 16, angle = 0, hjust = .5, vjust = .5),
+        axis.text.y = element_text(color="black",size = 16, angle = 0),
+        axis.title.x = element_text(color="black",size = 18, angle = 0),
+        axis.title.y = element_text(color="black",size = 18, angle = 90)
+  )+
+  # scale_x_continuous(breaks=seq(1, 10, 1))+
+  theme(legend.text=element_text(size=16))+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))+
+  scale_colour_manual(values=c(lineColors))
+##########################################################################################################################################################################
+
 
 str(training_ready)
 str(testing_ready)
