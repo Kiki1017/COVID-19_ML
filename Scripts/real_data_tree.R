@@ -58,7 +58,7 @@ for(i in 1:length(testing_countries)){
   }
 }
 
-##########################################################################################################################################################################
+#---first plot---#########################################################################################################################################################################
 lineColors <- c("firebrick","darkgoldenrod1", "darkviolet", "limegreen", "dodgerblue")
 ggplot() +
   geom_line(data=training_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size=0.8,alpha=.7)+
@@ -76,9 +76,7 @@ ggplot() +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
         panel.background = element_blank(), axis.line = element_line(colour = "black"))+
   scale_colour_manual(values=c(lineColors))
-##########################################################################################################################################################################
-
-
+#---training tree---#########################################################################################################################################################################
 str(training_ready)
 str(testing_ready)
 
@@ -117,8 +115,8 @@ fit <- rpart(confirmed_cum ~ time+
                Ave_household_size+
                EFindex,
              data=training_ready, 
-             method="poisson", #"anova", "poisson", "class" or "exp"
-             control=rpart.control(minsplit=20, cp=0.001))
+             method="anova", #"anova", "poisson", "class" or "exp"
+             control=rpart.control(minsplit=5, cp=0.001))
 summary(fit)
 rpart.plot(fit, main="Tree")
 
