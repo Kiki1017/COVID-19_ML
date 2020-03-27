@@ -58,6 +58,7 @@ country_timeseries <- function(df, country, incidence=T, plot=F){
     output <- output %>%
       mutate(confirmed_cum = cumsum(confirmed) / (pop/1000000)) %>%
       mutate(death_cum = cumsum(death) / (pop/1000000))
+  }
   if(plot==T){
     # Plot cummulative sum of cases
     p1 <- ggplot(output, aes(x=date, y=confirmed_cum)) +
