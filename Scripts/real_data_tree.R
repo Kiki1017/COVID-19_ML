@@ -16,7 +16,9 @@ glimpse(data_clean)
 summary(data_clean)
 
 # make country lists
-training_countries <- c("CHN","KOR","ITA","GBR","ESP","IRN","FRA","ANT","CHE","AUT","BRA","DEU")
+# training_countries <- c("CHN","KOR","USA","GBR","ESP","IRN","FRA","ANT","CHE","AUT","BRA","DEU")
+training_countries <- c("CHN","KOR","ITA")
+
 testing_countries <- c("USA")
 # testing_countries <- c("GBR")
 # testing_countries <- c("DEU")
@@ -58,7 +60,7 @@ for(i in 1:length(testing_countries)){
 ggplot() +
   geom_line(data=training_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size=0.8,alpha=.7)+
   geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1)+
-  labs(x="Days Since 100 Cumulative Counts", y = "Confirmed Cumulative Cases", title="") +
+  labs(x="Days Since 100 Cumulative Counts", y = "Confirmed Cumulative Cases per Million", title="") +
   guides(color=guide_legend(title="")) +
   theme(legend.title=element_text(size=18))+
   theme(axis.text.x = element_text(color="black",size = 16, angle = 0, hjust = .5, vjust = .5),
@@ -71,6 +73,22 @@ ggplot() +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
         panel.background = element_blank(), axis.line = element_line(colour = "black"))
   # scale_colour_manual(values=c(lineColors))
+ggplot() +
+  geom_line(data=training_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size=0.8,alpha=.7)+
+  geom_line(data=testing_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1)+
+  labs(x="Days Since 100 Cumulative Counts", y = "Confirmed Cumulative Cases", title="") +
+  guides(color=guide_legend(title="")) +
+  theme(legend.title=element_text(size=18))+
+  theme(axis.text.x = element_text(color="black",size = 16, angle = 0, hjust = .5, vjust = .5),
+        axis.text.y = element_text(color="black",size = 16, angle = 0),
+        axis.title.x = element_text(color="black",size = 18, angle = 0),
+        axis.title.y = element_text(color="black",size = 18, angle = 90)
+  )+
+  # scale_x_continuous(breaks=seq(1, 10, 1))+
+  theme(legend.text=element_text(size=16))+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))
+# scale_colour_manual(values=c(lineColors))
 #---training tree---#########################################################################################################################################################################
 str(training_ready)
 str(testing_ready)
