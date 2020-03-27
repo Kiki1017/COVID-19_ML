@@ -50,24 +50,14 @@ country_timeseries <- function(df, country, incidence=T, plot=F){
     ungroup()
   if(incidence==T){
     output <- output %>%
-<<<<<<< HEAD
       mutate(confirmed_cum_per_million = cumsum(confirmed) / (pop/1000000)) %>%
       mutate(death_cum_per_million = cumsum(death) / (pop/1000000)) %>%
       mutate(confirmed_cum = cumsum(confirmed)) %>%
       mutate(death_cum = cumsum(death))
   }else{
     output <- output %>%
-      mutate(confirmed_cum = cumsum(confirmed)) %>%
-      mutate(death_cum = cumsum(death))
-=======
       mutate(confirmed_cum = cumsum(confirmed) / (pop/1000000)) %>%
       mutate(death_cum = cumsum(death) / (pop/1000000))
-  }else{
-    output <- output %>%
-      mutate(confirmed_cum = cumsum(confirmed)) %>%
-      mutate(death_cum = cumsum(death)) #%>%
-    # mutate(recovered_cum = cumsum(recovered))
->>>>>>> 3cb04b41041cf65b2d4b9bb73e742e1fd7d14486
   }
   if(plot==T){
     # Plot cummulative sum of cases
