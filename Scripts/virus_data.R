@@ -4,7 +4,7 @@
 # Written on: March 20th, 2020
 
 # Install package for daily update of data:
-devtools::install_github("RamiKrispin/coronavirus")
+# devtools::install_github("RamiKrispin/coronavirus")
 
 
 # Load libraries
@@ -14,6 +14,7 @@ library(ggplot2)
 library(data.table)
 library(coronavirus)
 library(ggpubr)
+library(readxl)
 
 # Explore the data
 data("coronavirus")
@@ -22,21 +23,42 @@ head(coronavirus)
 # Load in csv files
 country_codes <- read.csv('./InputData/CountryCodes.csv')
 
+# Load in population data
+population <- read_excel("./InputData/pop.xlsx", sheet = "pop_1000s", col_names = T)
+
+population_countrycodes <- merge(country_codes,population, by='ISO3')
+population_countrycodes <- population_countrycodes %>%
+  mutate(Country = Country.x) %>%
+  select(-Country.x,-Country.y,-PopTotal_1000s)
+glimpse(population_countrycodes)
+
 # Add ISO country codes to project
-raw_data = tbl_df(merge(coronavirus, country_codes, by.x='Country.Region', by.y='Country'))
+raw_data = tbl_df(merge(coronavirus, population_countrycodes, by.x='Country.Region', by.y='Country'))
 
 ## Functions to apply to a single country  ----
 # Function to create a collapsed time series of data with cummulative sums for each country (if multiple regions exist)
-country_timeseries <- function(df, country, plot=F){
+country_timeseries <- function(df, country, incidence=T, plot=F){
+  pop <- df %>%
+    filter(ISO3==country) %>%
+    summarise(pop = mean(PopTotal))
+  pop <- as.numeric(pop)
   output <- df %>% filter(ISO3==country) %>%
     group_by(date, type) %>%
     summarise(daily_cases = sum(cases)) %>%
     pivot_wider(names_from = type,
                 values_from = daily_cases) %>%
-    ungroup() %>%
-    mutate(confirmed_cum = cumsum(confirmed)) %>%
-    mutate(death_cum = cumsum(death)) #%>%
-    # mutate(recovered_cum = cumsum(recovered))
+    ungroup()
+  if(incidence==T){
+    output <- output %>%
+      mutate(confirmed_cum_per_million = cumsum(confirmed) / (pop/1000000)) %>%
+      mutate(death_cum_per_million = cumsum(death) / (pop/1000000)) %>%
+      mutate(confirmed_cum = cumsum(confirmed)) %>%
+      mutate(death_cum = cumsum(death))
+  }else{
+    output <- output %>%
+      mutate(confirmed_cum = cumsum(confirmed)) %>%
+      mutate(death_cum = cumsum(death))
+  }
   if(plot==T){
     # Plot cummulative sum of cases
     p1 <- ggplot(output, aes(x=date, y=confirmed_cum)) +
@@ -76,6 +98,7 @@ create_lag <- function(country_ts, num=10){
 create_COVID_ML_df <- function(coronavirus, num_cases_min = 4000, num_lag=10){
   # aggregate the raw data
   summary_df <- coronavirus %>%
+    filter(Country.Region != 'Cruise Ship') %>%
     group_by(Country.Region, type) %>%
     summarise(total_cases = sum(cases)) %>%
     filter(type=='confirmed') %>%
@@ -92,7 +115,7 @@ create_COVID_ML_df <- function(coronavirus, num_cases_min = 4000, num_lag=10){
   # create the time series data and lag factors
   df_ts_lag_train <- data.frame()
   for(i in 1:length(countries_training$ISO3)){
-    df.ts <- country_timeseries(raw_data, countries_training$ISO3[i], plot = F)
+    df.ts <- country_timeseries(raw_data, countries_training$ISO3[i], incidence=T, plot = F)
     df.ts.lag <- create_lag(df.ts, num_lag)
     df.ts.lag$ISO3 <- countries_training$ISO3[i]
     df.ts.lag$Country <- countries_training$Country.Region[i]
@@ -102,19 +125,20 @@ create_COVID_ML_df <- function(coronavirus, num_cases_min = 4000, num_lag=10){
   print(paste0("Total number of countries included in analysis are: ", n_distinct(df_ts_lag_train$Country)))
   # print(paste0("Countries time histories included are: ", distinct(df_ts_lag_train, Country)))
   print(unique(df_ts_lag_train$Country))
+  print('Most recent date of data is:  ')
   print(max(df_ts_lag_train$date))
   return(df_ts_lag_train)
 }
 
 ## Looking at a single country -----
 
-country_ts <- country_timeseries(raw_data, 'USA', plot = T) #create time series and plot
+country_ts <- country_timeseries(raw_data, 'USA', incidence = T, plot = T) #create time series and plot
 country_ts_lag <- create_lag(country_ts, num=10)
 
 
 ## Creaint the full dataframe and saving the .csv file -----
 
-output_df <- create_COVID_ML_df(coronavirus, num_cases_min = 100, num_lag = 20)
+output_df <- create_COVID_ML_df(coronavirus, num_cases_min = 100, num_lag = 20)   # to change from cases per million to total cases, change default value in function defined above (country_timeseries)
 
 
 write.csv(output_df, file="InputData/data_COVID_2020_03_23.csv")

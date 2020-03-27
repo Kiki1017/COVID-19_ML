@@ -17,9 +17,9 @@ summary(data_clean)
 
 # make country lists
 training_countries <- c("CHN","KOR","ITA","ESP")
-# testing_countries <- c("USA")
+testing_countries <- c("USA")
 # testing_countries <- c("GBR")
-testing_countries <- c("AUS")
+# testing_countries <- c("AUS")
 # testing_countries <- c("BRA")
 
 
