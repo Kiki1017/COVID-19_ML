@@ -79,17 +79,17 @@ country_timeseries <- function(df, country, incidence=T, plot=F){
 create_lag <- function(country_ts, num=10){
   # creating lag variables for number of reported cases, deaths, and recovered
   lags <- seq(num)   # set the number of lag factors here
-  lag_names <- paste("cum_lag", formatC(lags, width = nchar(max(lags)), flag = "0"), 
+  lag_names <- paste("lag", formatC(lags, width = nchar(max(lags)), flag = "0"), 
                      sep = "_")
   lag_functions <- setNames(paste("dplyr::lag(., ", lags, ")"), lag_names)
   
   if(dim(country_ts)[2] > 7){
     # country_df <- country_ts %>% mutate_at(vars(confirmed, death, recovered), funs_(lag_functions)) %>%
-    country_df <- country_ts %>% mutate_at(vars(confirmed, death), funs_(lag_functions)) %>%
+    country_df <- country_ts %>% mutate_at(vars(confirmed_cum_per_million, death_cum_per_million), funs_(lag_functions)) %>%
     select(-values1_lag1, -values1_lag2, -values2_lag1, -values2_lag2)
   }else{
     # country_df <- country_ts %>% mutate_at(vars(confirmed, death, recovered), funs_(lag_functions))
-    country_df <- country_ts %>% mutate_at(vars(confirmed, death), funs_(lag_functions))
+    country_df <- country_ts %>% mutate_at(vars(confirmed_cum_per_million, death_cum_per_million), funs_(lag_functions))
   }
   return(country_df)
 }
