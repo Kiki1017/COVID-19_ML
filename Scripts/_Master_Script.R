@@ -10,6 +10,10 @@ source('./Scripts/Gather_GHSindex_data_static.R')
 source('./Scripts/data_cleaning.R')
 
 # Make a regression tree model
-source('./Scripts/real_data_tree.R')
+
+# Chris's model to srart
+#source('./Scripts/real_data_tree.R')
+
+# Jay's script (based on chris') using CARET so multiple models can be evaluated.
 
 
