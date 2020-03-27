@@ -102,26 +102,21 @@ create_COVID_ML_df <- function(coronavirus, num_cases_min = 4000, num_lag=10){
   print(paste0("Total number of countries included in analysis are: ", n_distinct(df_ts_lag_train$Country)))
   # print(paste0("Countries time histories included are: ", distinct(df_ts_lag_train, Country)))
   print(unique(df_ts_lag_train$Country))
+  print(max(df_ts_lag_train$date))
   return(df_ts_lag_train)
 }
 
 ## Looking at a single country -----
 
-country_ts <- country_timeseries(raw_data, 'ITA', plot = T) #create time series and plot
+country_ts <- country_timeseries(raw_data, 'USA', plot = T) #create time series and plot
 country_ts_lag <- create_lag(country_ts, num=10)
 
 
 ## Creaint the full dataframe and saving the .csv file -----
 
-output_df <- create_COVID_ML_df(coronavirus, num_cases_min = 1000, num_lag = 10)
+output_df <- create_COVID_ML_df(coronavirus, num_cases_min = 100, num_lag = 20)
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-write.csv(output_df, file="InputData/data_COVID_2020_03_24.csv")
-=======
+
 write.csv(output_df, file="InputData/data_COVID_2020_03_23.csv")
->>>>>>> 0123a27d7c26f931572a48a0ffdaf58e9db70073
-=======
-write.csv(output_df, file="InputData/data_COVID_2020_03_23.csv")
->>>>>>> 0123a27d7c26f931572a48a0ffdaf58e9db70073
+
 
