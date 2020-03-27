@@ -10,6 +10,6 @@ source('./Scripts/Gather_GHHSindex_data_static.R')
 source('./Scripts/data_cleaning.R')
 
 # Make a regression tree model
-source('real_data_tree.R')
+source('./Scripts/real_data_tree.R')
 
 
