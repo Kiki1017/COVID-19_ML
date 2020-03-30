@@ -17,10 +17,11 @@ summary(data_clean)
 
 # make country lists
 # training_countries <- c("CHN","KOR","USA","GBR","ESP","IRN","FRA","ANT","CHE","AUT","BRA","DEU")
-training_countries <- c("CHN","KOR","ITA")
+training_countries <- c("ITA","GBR","ZAF","BRA","ESP","MYS","CHN","KOR","USA")
+# training_countries <- c("CHN","KOR","ITA")
 
-testing_countries <- c("USA")
-# testing_countries <- c("GBR")
+# testing_countries <- c("USA")
+testing_countries <- c("DEU")
 # testing_countries <- c("DEU")
 # testing_countries <- c("BRA")
 
@@ -108,6 +109,9 @@ fit <- rpart(confirmed_cum_per_million ~ time+
                confirmed_cum_per_million_lag_12+
                confirmed_cum_per_million_lag_13+
                confirmed_cum_per_million_lag_14+
+               Social_Distancing +
+               Quaranting_Cases +
+               Close_Border +
                GHS_Prevent+
                GHS_Detect+
                GHS_Respond+
@@ -143,7 +147,7 @@ fit <- rpart(confirmed_cum_per_million ~ time+
                EFindex,
              data=training_ready, 
              method="anova", #"anova", "poisson", "class" or "exp"
-             control=rpart.control(minsplit=5, cp=0.001))
+             control=rpart.control(minsplit=2, cp=0.0001))
 summary(fit)
 rpart.plot(fit, main="Tree")
 
@@ -209,6 +213,21 @@ ggplot() +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
         panel.background = element_blank(), axis.line = element_line(colour = "black"))
   # scale_colour_manual(values=c(lineColors))
+
+# Plot variable importance
+df <- data.frame(imp = fit$variable.importance)
+df2 <- df %>% 
+  tibble::rownames_to_column() %>% 
+  dplyr::rename("variable" = rowname) %>% 
+  dplyr::arrange(imp) %>%
+  dplyr::mutate(variable = forcats::fct_inorder(variable))
+ggplot2::ggplot(df2) +
+  geom_segment(aes(x = variable, y = 0, xend = variable, yend = imp), 
+               size = 1.5, alpha = 0.7) +
+  geom_point(aes(x = variable, y = imp, col = variable), 
+             size = 4, show.legend = F) +
+  coord_flip() +
+  theme_bw()
 
 
 ###################################
