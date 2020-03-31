@@ -17,11 +17,11 @@ summary(data_clean)
 
 # make country lists
 # training_countries <- c("CHN","KOR","USA","GBR","ESP","IRN","FRA","ANT","CHE","AUT","BRA","DEU")
-training_countries <- c("ITA","GBR","ZAF","BRA","ESP","MYS","CHN","KOR","USA")
+training_countries <- c("ITA","GBR","ZAF","BRA","ESP","MYS","CHN","KOR","DEU")
 # training_countries <- c("CHN","KOR","ITA")
 
 # testing_countries <- c("USA")
-testing_countries <- c("DEU")
+testing_countries <- c("USA")
 # testing_countries <- c("DEU")
 # testing_countries <- c("BRA")
 
@@ -47,6 +47,9 @@ for(i in 1:length(testing_countries)){
   testing_subset_aligned <- testing_subset[start:nrow(testing_subset),]
   tmp <- testing_subset_aligned[1:projectionTime,]
   tmp[,grep("cum", colnames(tmp))] <- NA
+  tmp$Social_Distancing <- NA
+  tmp$Quaranting_Cases <- NA
+  tmp$Close_Border <- NA
   testing_subset_aligned_predictNA <- rbind(testing_subset_aligned,tmp)
   testing_subset_aligned_predictNA$time <- c(1:nrow(testing_subset_aligned_predictNA))
   if(i==1){
@@ -152,15 +155,35 @@ summary(fit)
 rpart.plot(fit, main="Tree")
 
 nLags <- 14
+# setting the NPIflag to "lastNPI" is our method of saying that we want to fill all the NAs in the forecasting period with the last empirical time points' NPI values
+NPIflag <- "lastNPI"
 testing_ready_pred <- testing_ready
 breaker <- nrow(testing_ready_pred)-projectionTime+1
 # testing_ready_pred[(breaker-1):(breaker+1),grep("confirmed_cum_per_million", colnames(testing_ready_pred))]
+
+# Note this code assumes that there are no NAs present in the NPI data
+if(NPIflag == "lastNPI"){
+  testing_ready_pred$Social_Distancing[head(which(!is.na(testing_ready_pred$Social_Distancing)),n=1):tail(which(is.na(testing_ready_pred$Social_Distancing)),n=1)] <- tail(testing_ready_pred$Social_Distancing[which(!is.na(testing_ready_pred$Social_Distancing))],n=1)
+  testing_ready_pred$Quaranting_Cases[head(which(!is.na(testing_ready_pred$Quaranting_Cases)),n=1):tail(which(is.na(testing_ready_pred$Quaranting_Cases)),n=1)] <- tail(testing_ready_pred$Quaranting_Cases[which(!is.na(testing_ready_pred$Quaranting_Cases))],n=1)
+  testing_ready_pred$Close_Border[head(which(!is.na(testing_ready_pred$Close_Border)),n=1):tail(which(is.na(testing_ready_pred$Close_Border)),n=1)] <- tail(testing_ready_pred$Close_Border[which(!is.na(testing_ready_pred$Close_Border))],n=1)
+}
+
+# Check before and after if you so desire, for the filling in of NPI data in the forecasting period.
+# testing_ready$Social_Distancing
+# testing_ready_pred$Social_Distancing
+# testing_ready$Quaranting_Cases
+# testing_ready_pred$Quaranting_Cases
+# testing_ready$Close_Border
+# testing_ready_pred$Close_Border
 
 p1 <- predict(fit, testing_ready_pred[1:breaker-1,], na.action = na.pass)
 for(i in breaker:nrow(testing_ready_pred)){
   for(l in 1:nLags){
     if(l==1){
       testing_ready_pred[i,c(paste0("confirmed_cum_per_million_lag_01"))] <- testing_ready_pred[i-1,c(paste0("confirmed_cum_per_million"))]
+      if(NPIflag != "lastNPI"){
+        # Some other forecasting of the NPI data
+      }
     }else{
       testing_ready_pred[i,c(paste0(sprintf("confirmed_cum_per_million_lag_%02d", l)))] <- testing_ready_pred[i-1,c(paste0(sprintf("confirmed_cum_per_million_lag_%02d", l-1)))]
     }
