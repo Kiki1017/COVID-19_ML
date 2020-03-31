@@ -18,6 +18,16 @@ summary(data_clean)
 # testing_countries <- c("USA")
 # testing_countries <- c("DEU")
 testing_countries <- c("BRA")
+<<<<<<< HEAD
+=======
+
+# make country lists
+training_countries_all <- c("CHN","KOR","USA","GBR","ESP","IRN","FRA","ANT","CHE","AUT","BRA","DEU")
+training_countries <- training_countries_all[which(training_countries_all != testing_countries)]
+# training_countries <- c("CHN","KOR","ITA")
+
+
+>>>>>>> 0ebc95de6b1611d86fdb1632c9060d1ac7fb9991
 
 # make country lists
 training_countries_all <- c("CHN","KOR","USA","GBR","ESP","IRN","FRA","ANT","CHE","AUT","BRA","DEU")
