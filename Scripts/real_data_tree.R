@@ -15,15 +15,16 @@ data_clean$date <- as.Date(data_clean$date)
 glimpse(data_clean)
 summary(data_clean)
 
+# testing_countries <- c("USA")
+# testing_countries <- c("DEU")
+testing_countries <- c("BRA")
+
 # make country lists
-# training_countries <- c("CHN","KOR","USA","GBR","ESP","IRN","FRA","ANT","CHE","AUT","BRA","DEU")
-training_countries <- c("ITA","GBR","ZAF","BRA","ESP","MYS","CHN","KOR","DEU")
+training_countries_all <- c("CHN","KOR","USA","GBR","ESP","IRN","FRA","ANT","CHE","AUT","BRA","DEU")
+training_countries <- training_countries_all[which(training_countries_all != testing_countries)]
 # training_countries <- c("CHN","KOR","ITA")
 
-# testing_countries <- c("USA")
-testing_countries <- c("USA")
-# testing_countries <- c("DEU")
-# testing_countries <- c("BRA")
+
 
 
 # subset to 100 cumulative cases as starting time threshold and add time column
@@ -152,7 +153,7 @@ fit <- rpart(confirmed_cum_per_million ~ time+
              method="anova", #"anova", "poisson", "class" or "exp"
              control=rpart.control(minsplit=2, cp=0.0001))
 summary(fit)
-rpart.plot(fit, main="Tree")
+# rpart.plot(fit, main="Tree")
 
 nLags <- 14
 # setting the NPIflag to "lastNPI" is our method of saying that we want to fill all the NAs in the forecasting period with the last empirical time points' NPI values
@@ -223,7 +224,7 @@ m1 <- m1[order(m1$time),]
 ggplot() +
   geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size=0.8,alpha=.7)+
   geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size=0.85, linetype = "3313",alpha=.7)+
-  labs(x="Days Since 100 Cumulative Counts", y = "Confirmed Cumulative Cases", title="") +
+  labs(x="Days Since 100 Cumulative Counts", y = "Confirmed Cumulative Cases per Million", title="") +
   guides(color=guide_legend(title="")) +
   theme(legend.title=element_text(size=18))+
   theme(axis.text.x = element_text(color="black",size = 16, angle = 0, hjust = .5, vjust = .5),
