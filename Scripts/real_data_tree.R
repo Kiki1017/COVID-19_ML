@@ -13,7 +13,7 @@ library(randomForest)
 # TRUE if you want to scale by population
 incidence_flag <- T
 # TRUE if you want to do deaths instead of cases
-death_flag <- T
+death_flag <- F
 incidence_start_point <- 0.3
 count_start_point <- 100
 nLags <- 14
@@ -30,7 +30,8 @@ testing_countries <- c("GBR")
 # testing_countries <- c("BRA")
 
 # make country lists
-training_countries_all <- c("CHN","KOR","USA","GBR","ESP","IRN","FRA","ANT","CHE","AUT","BRA","DEU")
+training_countries_all <- c("CHN","KOR","USA","GBR","ITA")
+# training_countries_all <- c("CHN","KOR","USA","GBR","ESP","IRN","FRA","ANT","CHE","AUT","BRA","DEU")
 training_countries <- training_countries_all[which(training_countries_all != testing_countries)]
 # training_countries <- c("CHN","KOR","ITA")
 
