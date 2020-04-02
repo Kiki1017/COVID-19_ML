@@ -6,6 +6,8 @@
 # Install package for daily update of data:
 # devtools::install_github("RamiKrispin/coronavirus")
 
+# TRUE if you want to scale by population
+incidence_flag <- T
 
 # Load libraries
 library(dplyr)
@@ -56,8 +58,8 @@ country_timeseries <- function(df, country, incidence=T, plot=F){
       mutate(death_cum = cumsum(death))
   }else{
     output <- output %>%
-      mutate(confirmed_cum = cumsum(confirmed) / (pop/1000000)) %>%
-      mutate(death_cum = cumsum(death) / (pop/1000000))
+      mutate(confirmed_cum = cumsum(confirmed) ) %>%
+      mutate(death_cum = cumsum(death) )
   }
   if(plot==T){
     # Plot cummulative sum of cases
@@ -76,7 +78,7 @@ country_timeseries <- function(df, country, incidence=T, plot=F){
 }
 
 # function to create lag factors for a country's time series
-create_lag <- function(country_ts, num=10){
+create_lag <- function(country_ts, num=10, incidence=T){
   # creating lag variables for number of reported cases, deaths, and recovered
   lags <- seq(num)   # set the number of lag factors here
   lag_names <- paste("lag", formatC(lags, width = nchar(max(lags)), flag = "0"), 
@@ -85,17 +87,26 @@ create_lag <- function(country_ts, num=10){
   
   if(dim(country_ts)[2] > 7){
     # country_df <- country_ts %>% mutate_at(vars(confirmed, death, recovered), funs_(lag_functions)) %>%
-    country_df <- country_ts %>% mutate_at(vars(confirmed_cum_per_million, death_cum_per_million), funs_(lag_functions)) %>%
-    select(-values1_lag1, -values1_lag2, -values2_lag1, -values2_lag2)
+    if(incidence==T){
+      country_df <- country_ts %>% mutate_at(vars(confirmed_cum_per_million, death_cum_per_million), funs_(lag_functions)) %>%
+        select(-values1_lag1, -values1_lag2, -values2_lag1, -values2_lag2)
+    }else{
+      country_df <- country_ts %>% mutate_at(vars(confirmed_cum, death_cum), funs_(lag_functions)) %>%
+        select(-values1_lag1, -values1_lag2, -values2_lag1, -values2_lag2)
+    }
   }else{
     # country_df <- country_ts %>% mutate_at(vars(confirmed, death, recovered), funs_(lag_functions))
-    country_df <- country_ts %>% mutate_at(vars(confirmed_cum_per_million, death_cum_per_million), funs_(lag_functions))
+    if(incidence==T){
+      country_df <- country_ts %>% mutate_at(vars(confirmed_cum_per_million, death_cum_per_million), funs_(lag_functions))
+    }else{
+      country_df <- country_ts %>% mutate_at(vars(confirmed_cum, death_cum), funs_(lag_functions))
+    }
   }
   return(country_df)
 }
 
 # function for creating full dataframe 
-create_COVID_ML_df <- function(coronavirus, num_cases_min = 4000, num_lag=10){
+create_COVID_ML_df <- function(coronavirus, num_cases_min = 4000, num_lag=10, incidence_flag=T){
   # aggregate the raw data
   summary_df <- coronavirus %>%
     filter(Country.Region != 'Cruise Ship') %>%
@@ -115,8 +126,8 @@ create_COVID_ML_df <- function(coronavirus, num_cases_min = 4000, num_lag=10){
   # create the time series data and lag factors
   df_ts_lag_train <- data.frame()
   for(i in 1:length(countries_training$ISO3)){
-    df.ts <- country_timeseries(raw_data, countries_training$ISO3[i], incidence=T, plot = F)
-    df.ts.lag <- create_lag(df.ts, num_lag)
+    df.ts <- country_timeseries(raw_data, countries_training$ISO3[i], incidence=incidence_flag, plot = F)
+    df.ts.lag <- create_lag(df.ts, num_lag, incidence=incidence_flag)
     df.ts.lag$ISO3 <- countries_training$ISO3[i]
     df.ts.lag$Country <- countries_training$Country.Region[i]
     df_ts_lag_train <- rbind(df_ts_lag_train,df.ts.lag)
@@ -132,13 +143,13 @@ create_COVID_ML_df <- function(coronavirus, num_cases_min = 4000, num_lag=10){
 
 ## Looking at a single country -----
 
-country_ts <- country_timeseries(raw_data, 'USA', incidence = T, plot = T) #create time series and plot
-country_ts_lag <- create_lag(country_ts, num=10)
+country_ts <- country_timeseries(raw_data, 'USA', incidence = incidence_flag, plot = T) #create time series and plot
+country_ts_lag <- create_lag(country_ts, num=10, incidence = incidence_flag)
 
 
 ## Creaint the full dataframe and saving the .csv file -----
 
-output_df <- create_COVID_ML_df(coronavirus, num_cases_min = 100, num_lag = 20)   # to change from cases per million to total cases, change default value in function defined above (country_timeseries)
+output_df <- create_COVID_ML_df(coronavirus, num_cases_min = 100, num_lag = 20, incidence_flag = incidence_flag)   # to change from cases per million to total cases, change default value in function defined above (country_timeseries)
 
 
 write.csv(output_df, file="InputData/data_COVID_2020_03_23.csv")
