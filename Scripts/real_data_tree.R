@@ -25,12 +25,13 @@ data_clean$date <- as.Date(data_clean$date)
 glimpse(data_clean)
 summary(data_clean)
 
-# testing_countries <- c("USA")
-testing_countries <- c("GBR")
+testing_countries <- c("USA")
+# testing_countries <- c("GBR")
 # testing_countries <- c("BRA")
+# testing_countries <- c("ZAF")
 
-# make country lists
-training_countries_all <- c("CHN","KOR","USA","GBR","ITA")
+# make country lists, these are the ones that we have NPI data collected for
+training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","CHN","KOR","USA")
 # training_countries_all <- c("CHN","KOR","USA","GBR","ESP","IRN","FRA","ANT","CHE","AUT","BRA","DEU")
 training_countries <- training_countries_all[which(training_countries_all != testing_countries)]
 # training_countries <- c("CHN","KOR","ITA")
@@ -104,11 +105,11 @@ if(incidence_flag==T && death_flag==F){
 }
 plot1 <- plot1 +
   guides(color=guide_legend(title="")) +
-  theme(legend.title=element_text(size=18))+
-  theme(axis.text.x = element_text(color="black",size = 16, angle = 0, hjust = .5, vjust = .5),
-        axis.text.y = element_text(color="black",size = 16, angle = 0),
-        axis.title.x = element_text(color="black",size = 18, angle = 0),
-        axis.title.y = element_text(color="black",size = 18, angle = 90)
+  theme(legend.title=element_text(size=14))+
+  theme(axis.text.x = element_text(color="black",size = 13, angle = 0, hjust = .5, vjust = .5),
+        axis.text.y = element_text(color="black",size = 13, angle = 0),
+        axis.title.x = element_text(color="black",size = 13, angle = 0),
+        axis.title.y = element_text(color="black",size = 13, angle = 90)
   )+
   # scale_x_continuous(breaks=seq(1, 10, 1))+
   # scale_colour_manual(values=c(lineColors))
@@ -116,7 +117,7 @@ plot1 <- plot1 +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
         panel.background = element_blank(), axis.line = element_line(colour = "black"))
 
-print(plot1)
+# print(plot1)
 
 #---training tree---#########################################################################################################################################################################
 str(training_ready)
@@ -147,11 +148,11 @@ if(death_flag==F){
   testing_ready_sub2 %<>% mutate_if(is.character,as.numeric)
   # na.omit returns the object with incomplete cases removed. na.pass returns the object unchanged.
   if(incidence_flag==T){
-    # training_ready_sub2 <- subset(training_ready_sub2, select=-c(confirmed_cum))
-    # testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(confirmed_cum))
+    training_ready_sub2 <- subset(training_ready_sub2, select=-c(confirmed_cum))
+    testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(confirmed_cum))
     fit <- rpart(confirmed_cum_per_million ~ ., data = training_ready_sub2, method="anova", #"anova", "poisson", "class" or "exp"
                  control=rpart.control(minsplit=2, cp=0.0001))
-    fitrf <- randomForest(confirmed_cum ~ ., data = training_ready_sub2, importance = TRUE, na.action = na.omit)
+    fitrf <- randomForest(confirmed_cum_per_million ~ ., data = training_ready_sub2, importance = TRUE, na.action = na.omit)
   }else{
     # training_ready_sub2 <- subset(training_ready_sub2, select=-c(confirmed_cum_per_million))
     # testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(confirmed_cum_per_million))
@@ -381,11 +382,11 @@ if(incidence_flag==T && death_flag==F){
 }
 plot_predict <- plot_predict +
   guides(color=guide_legend(title="")) +
-  theme(legend.title=element_text(size=18))+
-  theme(axis.text.x = element_text(color="black",size = 16, angle = 0, hjust = .5, vjust = .5),
-        axis.text.y = element_text(color="black",size = 16, angle = 0),
-        axis.title.x = element_text(color="black",size = 18, angle = 0),
-        axis.title.y = element_text(color="black",size = 18, angle = 90)
+  theme(legend.title=element_text(size=14))+
+  theme(axis.text.x = element_text(color="black",size = 13, angle = 0, hjust = .5, vjust = .5),
+        axis.text.y = element_text(color="black",size = 13, angle = 0),
+        axis.title.x = element_text(color="black",size = 13, angle = 0),
+        axis.title.y = element_text(color="black",size = 13, angle = 90)
   )+
   # scale_x_continuous(breaks=seq(1, 10, 1))+
   # scale_colour_manual(values=c(lineColors))
@@ -393,7 +394,7 @@ plot_predict <- plot_predict +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
         panel.background = element_blank(), axis.line = element_line(colour = "black"))
 
-print(plot_predict)
+# print(plot_predict)
 
 
 
@@ -404,7 +405,7 @@ df2 <- df %>%
   dplyr::rename("variable" = rowname) %>% 
   dplyr::arrange(imp) %>%
   dplyr::mutate(variable = forcats::fct_inorder(variable))
-ggplot2::ggplot(df2) +
+plot_varimp <- ggplot2::ggplot(df2) +
   geom_segment(aes(x = variable, y = 0, xend = variable, yend = imp), 
                size = 1.5, alpha = 0.7) +
   geom_point(aes(x = variable, y = imp, col = variable), 
@@ -415,4 +416,19 @@ ggplot2::ggplot(df2) +
 
 ###################################
 
+library(gridExtra)
+library(grid)
+library(ggplot2)
+library(lattice)
+library(ggpubr)
+
+
+gl <- list(plot1,plot_predict,plot_varimp)
+
+grid.arrange(grobs = gl, layout_matrix = rbind(c(1,1,1,1,2,2,2,2),
+                                               c(1,1,1,1,2,2,2,2),
+                                               c(1,1,1,1,2,2,2,2),
+                                               c(3,3,3,3,3,3,3,3),
+                                               c(3,3,3,3,3,3,3,3),
+                                               c(3,3,3,3,3,3,3,3)))
 
