@@ -18,6 +18,9 @@ library(coronavirus)
 library(ggpubr)
 library(readxl)
 
+# Update data?
+update_datasets()
+
 # Explore the data
 data("coronavirus")
 head(coronavirus)
@@ -88,11 +91,11 @@ create_lag <- function(country_ts, num=10, incidence=T){
   if(dim(country_ts)[2] > 7){
     # country_df <- country_ts %>% mutate_at(vars(confirmed, death, recovered), funs_(lag_functions)) %>%
     if(incidence==T){
-      country_df <- country_ts %>% mutate_at(vars(confirmed_cum_per_million, death_cum_per_million), funs_(lag_functions)) %>%
-        select(-values1_lag1, -values1_lag2, -values2_lag1, -values2_lag2)
+      country_df <- country_ts %>% mutate_at(vars(confirmed_cum_per_million, death_cum_per_million), funs_(lag_functions)) #%>%
+        # select(-values1_lag1, -values1_lag2, -values2_lag1, -values2_lag2)
     }else{
-      country_df <- country_ts %>% mutate_at(vars(confirmed_cum, death_cum), funs_(lag_functions)) %>%
-        select(-values1_lag1, -values1_lag2, -values2_lag1, -values2_lag2)
+      country_df <- country_ts %>% mutate_at(vars(confirmed_cum, death_cum), funs_(lag_functions)) #%>%
+        # select(-values1_lag1, -values1_lag2, -values2_lag1, -values2_lag2)
     }
   }else{
     # country_df <- country_ts %>% mutate_at(vars(confirmed, death, recovered), funs_(lag_functions))
@@ -149,9 +152,9 @@ country_ts_lag <- create_lag(country_ts, num=10, incidence = incidence_flag)
 
 ## Creaint the full dataframe and saving the .csv file -----
 
-output_df <- create_COVID_ML_df(coronavirus, num_cases_min = 100, num_lag = 20, incidence_flag = incidence_flag)   # to change from cases per million to total cases, change default value in function defined above (country_timeseries)
+output_df <- create_COVID_ML_df(coronavirus, num_cases_min = 1000, num_lag = 20, incidence_flag = incidence_flag)   # to change from cases per million to total cases, change default value in function defined above (country_timeseries)
 
 
-write.csv(output_df, file="InputData/data_COVID_2020_03_23.csv")
+write.csv(output_df, file="InputData/data_COVID_2020_04_02.csv")
 
 
