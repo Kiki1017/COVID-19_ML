@@ -7,7 +7,7 @@
 # devtools::install_github("RamiKrispin/coronavirus")
 
 # TRUE if you want to scale by population
-incidence_flag <- T
+incidence_flag <- F
 
 # Load libraries
 library(dplyr)

@@ -11,7 +11,7 @@ library(randomForest)
 
 
 # TRUE if you want to scale by population
-incidence_flag <- T
+incidence_flag <- F
 # TRUE if you want to do deaths instead of cases
 death_flag <- F
 incidence_start_point <- 0.3
@@ -34,7 +34,7 @@ testing_countries <- c("USA")
 training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","CHN","KOR","USA")
 # training_countries_all <- c("CHN","KOR","USA","GBR","ESP","IRN","FRA","ANT","CHE","AUT","BRA","DEU")
 training_countries <- training_countries_all[which(training_countries_all != testing_countries)]
-# training_countries <- c("CHN","KOR","ITA")
+training_countries <- c("CHN","KOR","ITA")
 
 # subset to 100 cumulative cases as starting time threshold and add time column
 for(i in 1:length(training_countries)){
