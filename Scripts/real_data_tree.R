@@ -8,6 +8,7 @@ library(rpart)
 library(ggplot2)
 library(rpart.plot)
 library(randomForest)
+library(randomcoloR)
 
 
 # TRUE if you want to scale by population
@@ -15,6 +16,8 @@ incidence_flag <- F
 # TRUE if you want to do deaths instead of cases
 death_flag <- F
 incidence_start_point <- 0.3
+# if wee are doing deaths, we want incidence start point to be about 1/20th because that's the approx mortality rate
+if(death_flag==T){incidence_start_point <- incidence_start_point/20}
 count_start_point <- 100
 nLags <- 14
 
@@ -25,16 +28,18 @@ data_clean$date <- as.Date(data_clean$date)
 glimpse(data_clean)
 summary(data_clean)
 
-testing_countries <- c("USA")
-# testing_countries <- c("GBR")
+# testing_countries <- c("USA")
+testing_countries <- c("GBR")
 # testing_countries <- c("BRA")
+# testing_countries <- c("ESP")
 # testing_countries <- c("ZAF")
 
 # make country lists, these are the ones that we have NPI data collected for
-training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","CHN","KOR","USA")
+# training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","CHN","KOR","USA")
 # training_countries_all <- c("CHN","KOR","USA","GBR","ESP","IRN","FRA","ANT","CHE","AUT","BRA","DEU")
+training_countries_all <- c("CHN","KOR","ITA","USA","ESP","BRA","GBR")
 training_countries <- training_countries_all[which(training_countries_all != testing_countries)]
-training_countries <- c("CHN","KOR","ITA")
+# training_countries <- c("CHN","KOR","ITA","USA","ESP","BRA")
 
 # subset to 100 cumulative cases as starting time threshold and add time column
 for(i in 1:length(training_countries)){
@@ -85,22 +90,34 @@ plot1 <- ggplot()
 if(incidence_flag==T && death_flag==F){
   plot1 <- plot1 +
   geom_line(data=training_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size=0.8,alpha=.7)+
-  geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1) +
+  # geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1) +
+  geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size = 3, colour = 'red', alpha = 0.1) +
+  geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size = 2, colour = 'red', alpha = 0.2) +
+  geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size = 1, colour = 'red', alpha = 0.5) +
   labs(x=paste0("Days Since ",incidence_start_point," Cumulative Counts per Million"), y = "Confirmed Cumulative Cases per Million", title="")
 }else if(incidence_flag==T && death_flag==T){
   plot1 <- plot1 +
   geom_line(data=training_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size=0.8,alpha=.7)+
-  geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1)+
+  # geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1)+
+  geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size = 3, colour = 'red', alpha = 0.1) +
+  geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size = 2, colour = 'red', alpha = 0.2) +
+  geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size = 1, colour = 'red', alpha = 0.5) +
   labs(x=paste0("Days Since ",incidence_start_point," Cumulative Deaths per Million"), y = "Confirmed Cumulative Deaths per Million", title="")
 }else if(incidence_flag==F && death_flag==F){
   plot1 <- plot1 +
     geom_line(data=training_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size=0.8,alpha=.7)+
-    geom_line(data=testing_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1)+
+    # geom_line(data=testing_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1)+
+    geom_line(data=testing_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size = 3, colour = 'red', alpha = 0.1) +
+    geom_line(data=testing_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size = 2, colour = 'red', alpha = 0.2) +
+    geom_line(data=testing_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size = 1, colour = 'red', alpha = 0.5) +
     labs(x=paste0("Days Since ",count_start_point," Cumulative Counts"), y = "Confirmed Cumulative Cases", title="")
 }else if(incidence_flag==F && death_flag==T){
   plot1 <- plot1 +
     geom_line(data=training_ready, aes(x = time, y = death_cum, group = FullName, color = FullName), size=0.8,alpha=.7)+
-    geom_line(data=testing_ready, aes(x = time, y = death_cum, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1)+
+    # geom_line(data=testing_ready, aes(x = time, y = death_cum, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1)+
+    geom_line(data=testing_ready, aes(x = time, y = death_cum, group = FullName, color = FullName), size = 3, colour = 'red', alpha = 0.1) +
+    geom_line(data=testing_ready, aes(x = time, y = death_cum, group = FullName, color = FullName), size = 2, colour = 'red', alpha = 0.2) +
+    geom_line(data=testing_ready, aes(x = time, y = death_cum, group = FullName, color = FullName), size = 1, colour = 'red', alpha = 0.5) +
     labs(x=paste0("Days Since ",count_start_point," Cumulative Deaths"), y = "Confirmed Cumulative Deaths", title="")
 }
 plot1 <- plot1 +
@@ -112,7 +129,6 @@ plot1 <- plot1 +
         axis.title.y = element_text(color="black",size = 13, angle = 90)
   )+
   # scale_x_continuous(breaks=seq(1, 10, 1))+
-  # scale_colour_manual(values=c(lineColors))
   theme(legend.text=element_text(size=16))+
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
         panel.background = element_blank(), axis.line = element_line(colour = "black"))
@@ -158,6 +174,7 @@ if(death_flag==F){
     # testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(confirmed_cum_per_million))
     fit <- rpart(confirmed_cum ~ ., data = training_ready_sub2, method="anova", #"anova", "poisson", "class" or "exp"
                  control=rpart.control(minsplit=2, cp=0.0001))
+    # rpart.plot(fit, main="Tree")
     fitrf <- randomForest(confirmed_cum ~ ., data = training_ready_sub2, importance = TRUE, na.action = na.omit)
   }
 
@@ -279,7 +296,7 @@ if(NPIflag == "lastNPI"){
 # testing_ready$Close_Border
 # testing_ready_pred$Close_Border
 
-p1 <- predict(fit, testing_ready_pred[1:(breaker-1),], na.action = na.pass)
+p1 <- predict(fitrf, testing_ready_pred[1:(breaker-1),], na.action = na.pass)
 for(i in breaker:nrow(testing_ready_pred)){
   for(l in 1:nLags){
     if(l==1){
@@ -308,20 +325,20 @@ for(i in breaker:nrow(testing_ready_pred)){
     }
   }
   if(incidence_flag==T && death_flag==F){
-    testing_ready_pred[i,c(paste0("confirmed_cum_per_million"))] <- predict(fit, testing_ready_pred[i,], na.action = na.pass)
+    testing_ready_pred[i,c(paste0("confirmed_cum_per_million"))] <- predict(fitrf, testing_ready_pred[i,], na.action = na.pass)
   }else if(incidence_flag==T && death_flag==T){
-    testing_ready_pred[i,c(paste0("death_cum_per_million"))] <- predict(fit, testing_ready_pred[i,], na.action = na.pass)
+    testing_ready_pred[i,c(paste0("death_cum_per_million"))] <- predict(fitrf, testing_ready_pred[i,], na.action = na.pass)
   }else if(incidence_flag==F && death_flag==F){
-    testing_ready_pred[i,c(paste0("confirmed_cum"))] <- predict(fit, testing_ready_pred[i,], na.action = na.pass)
+    testing_ready_pred[i,c(paste0("confirmed_cum"))] <- predict(fitrf, testing_ready_pred[i,], na.action = na.pass)
   }else if(incidence_flag==F && death_flag==T){
-    testing_ready_pred[i,c(paste0("death_cum"))] <- predict(fit, testing_ready_pred[i,], na.action = na.pass)
+    testing_ready_pred[i,c(paste0("death_cum"))] <- predict(fitrf, testing_ready_pred[i,], na.action = na.pass)
   }
   # testing_ready_pred[(breaker-5):(i),grep("confirmed_cum_per_million", colnames(testing_ready_pred))]
   if(i==breaker){
-    pN <- predict(fit, testing_ready_pred[i,], na.action = na.pass)
+    pN <- predict(fitrf, testing_ready_pred[i,], na.action = na.pass)
     pAll <- c(p1,pN)
   }else{
-    pN <- predict(fit, testing_ready_pred[i,], na.action = na.pass)
+    pN <- predict(fitrf, testing_ready_pred[i,], na.action = na.pass)
     pAll <- c(pAll,pN)
   }
 }
@@ -359,25 +376,26 @@ m1 <- m1[order(m1$time),]
 #---plot prediction---#############
 
 plot_predict <- ggplot() 
+plot_predict <- plot_predict +
+  # geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size=0.8,alpha=.7)+
+  geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size = 3, colour = 'red', alpha = 0.1) +
+  geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size = 2, colour = 'red', alpha = 0.2) +
+  geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size = 1, colour = 'red', alpha = 0.5) +
+  geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size=0.85, colour = 'red', linetype = "3313",alpha=.7)
+  # geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size = 3, colour = 'red', alpha = 0.1, linetype = "3313") +
+  # geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size = 2, colour = 'red', alpha = 0.2, linetype = "3313") +
+  # geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size = 1, colour = 'red', alpha = 0.5, linetype = "3313") +
 if(incidence_flag==T && death_flag==F){
   plot_predict <- plot_predict +
-    geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size=0.8,alpha=.7)+
-    geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size=0.85, linetype = "3313",alpha=.7)+
     labs(x=paste0("Days Since ",incidence_start_point," Cumulative Counts per Million"), y = "Confirmed Cumulative Cases per Million", title="")
 }else if(incidence_flag==T && death_flag==T){
   plot_predict <- plot_predict +
-    geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size=0.8,alpha=.7)+
-    geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size=0.85, linetype = "3313",alpha=.7)+
     labs(x=paste0("Days Since ",incidence_start_point," Cumulative per Million"), y = "Confirmed Cumulative Deaths per Million", title="")
 }else if(incidence_flag==F && death_flag==F){
   plot_predict <- plot_predict +
-    geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size=0.8,alpha=.7)+
-    geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size=0.85, linetype = "3313",alpha=.7)+
     labs(x=paste0("Days Since ",count_start_point," Cumulative Counts"), y = "Confirmed Cumulative Cases", title="")
 }else if(incidence_flag==F && death_flag==T){
   plot_predict <- plot_predict +
-    geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size=0.8,alpha=.7)+
-    geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size=0.85, linetype = "3313",alpha=.7)+
     labs(x=paste0("Days Since ",count_start_point," Cumulative Deaths"), y = "Confirmed Cumulative Deaths", title="")
 }
 plot_predict <- plot_predict +
@@ -425,7 +443,7 @@ library(ggpubr)
 
 gl <- list(plot1,plot_predict,plot_varimp)
 
-grid.arrange(grobs = gl, layout_matrix = rbind(c(1,1,1,1,2,2,2,2),
+grid.arrange(grobs = gl, top = textGrob(paste0(testing_ready$FullName[1]), gp=gpar(fontsize=15)), layout_matrix = rbind(c(1,1,1,1,2,2,2,2),
                                                c(1,1,1,1,2,2,2,2),
                                                c(1,1,1,1,2,2,2,2),
                                                c(3,3,3,3,3,3,3,3),
