@@ -12,7 +12,7 @@ library(randomcoloR)
 
 
 # TRUE if you want to scale by population
-incidence_flag <- F
+incidence_flag <- T
 # TRUE if you want to do deaths instead of cases
 death_flag <- F
 incidence_start_point <- 0.3
@@ -29,15 +29,16 @@ glimpse(data_clean)
 summary(data_clean)
 
 # testing_countries <- c("USA")
-testing_countries <- c("GBR")
+# testing_countries <- c("GBR")
 # testing_countries <- c("BRA")
 # testing_countries <- c("ESP")
-# testing_countries <- c("ZAF")
+testing_countries <- c("ZAF")
 
 # make country lists, these are the ones that we have NPI data collected for
 # training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","CHN","KOR","USA")
 # training_countries_all <- c("CHN","KOR","USA","GBR","ESP","IRN","FRA","ANT","CHE","AUT","BRA","DEU")
-training_countries_all <- c("CHN","KOR","ITA","USA","ESP","BRA","GBR")
+# training_countries_all <- c("CHN","KOR","ITA","USA","ESP","BRA","GBR")
+training_countries_all <- c("HUB","KOR","ITA","USA","ESP","BRA","GBR")
 training_countries <- training_countries_all[which(training_countries_all != testing_countries)]
 # training_countries <- c("CHN","KOR","ITA","USA","ESP","BRA")
 

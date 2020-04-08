@@ -7,7 +7,8 @@
 # devtools::install_github("RamiKrispin/coronavirus")
 
 # TRUE if you want to scale by population
-incidence_flag <- F
+incidence_flag <- T
+HubeiFlag <- T
 
 # Load libraries
 library(dplyr)
@@ -29,7 +30,7 @@ head(coronavirus)
 country_codes <- read.csv('./InputData/CountryCodes.csv')
 
 # Load in population data
-population <- read_excel("./InputData/pop.xlsx", sheet = "pop_1000s", col_names = T)
+population <- read_excel("./InputData/pop_hub.xlsx", sheet = "pop_1000s", col_names = T)
 
 population_countrycodes <- merge(country_codes,population, by='ISO3')
 population_countrycodes <- population_countrycodes %>%
@@ -154,6 +155,12 @@ country_ts_lag <- create_lag(country_ts, num=10, incidence = incidence_flag)
 
 output_df <- create_COVID_ML_df(coronavirus, num_cases_min = 1000, num_lag = 20, incidence_flag = incidence_flag)   # to change from cases per million to total cases, change default value in function defined above (country_timeseries)
 
+if(HubeiFlag == T){
+  output_df$Country <- as.character(output_df$Country)
+  output_df$Country[output_df$Country == "China"] <- "Hubei"
+  output_df$ISO3 <- as.character(output_df$ISO3)
+  output_df$ISO3[output_df$ISO3 == "CHN"] <- "HUB"
+}
 
 write.csv(output_df, file="InputData/data_COVID_2020_04_02.csv")
 

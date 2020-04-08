@@ -2,6 +2,14 @@ library(tidyverse)
 library(readxl)
 library(reshape2)
 
+HubeiFlag <- T
+if(HubeiFlag == T){
+  xlFile <- "./InputData/GHSindex_data_static_hub.xlsx"
+}else{
+  xlFile <- "./InputData/GHSindex_data_static.xlsx"
+}
+
+
 print(getwd())
 
 ###########################################################################################################################################
@@ -34,7 +42,7 @@ for(i in 1:length(static_variables_list)){
   }else{
     var_name_with_prefix <- var_name
   }
-  assign(var_name, read_excel("./InputData/GHSindex_data_static.xlsx", sheet = var_name, col_names = F))
+  assign(var_name, read_excel(xlFile, sheet = var_name, col_names = F))
   if(var_name == "CountryCodes"){
     assign(var_name, eval(parse(text = var_name)) %>% rename("ISO3" = "...1") )
     assign(var_name, eval(parse(text = var_name)) %>% rename("FullName" = "...2") )
@@ -55,7 +63,7 @@ dim(merge_all)
 
 ###########################################################################################################################################
 # Popultation Structure by gender and age
-pop_structure <- read_excel("./InputData/GHSindex_data_static.xlsx", sheet = "PopulationStructure", col_names = T)
+pop_structure <- read_excel(xlFile, sheet = "PopulationStructure", col_names = T)
 
 pop_structure$AgeGroup[pop_structure$AgeGroup == "0-14 years"] <- "age_0_14"
 pop_structure$AgeGroup[pop_structure$AgeGroup == "15-24 years"] <- "age_15_24"
@@ -92,7 +100,7 @@ dim(merge_all)
 ###########################################################################################################################################
 # Popultation growth rate
 
-pop_growth <- read_excel("./InputData/GHSindex_data_static.xlsx", sheet = "PopulationGrowthRate", col_names = F)
+pop_growth <- read_excel(xlFile, sheet = "PopulationGrowthRate", col_names = F)
 colnames(pop_growth) <- c("FullName","PopulationGrowthRate")
 merge_all$FullName[which(merge_all$FullName %ni% unique(pop_growth$FullName))]
 
@@ -123,7 +131,7 @@ dim(merge_all)
 ###########################################################################################################################################
 # Popultation smoking
 
-pop_smoke <- read_excel("./InputData/GHSindex_data_static.xlsx", sheet = "PopulationSmoking", col_names = T)
+pop_smoke <- read_excel(xlFile, sheet = "PopulationSmoking", col_names = T)
 merge_all$PopulationSmoking_male <- NA
 merge_all$PopulationSmoking_female <- NA
 
@@ -170,7 +178,7 @@ for(i in 1:length(merge_all$ISO3)){
 ###########################################################################################################################################
 # GINI Index
 
-gini <- read_excel("./InputData/GHSindex_data_static.xlsx", sheet = "GINIindex", col_names = F)
+gini <- read_excel(xlFile, sheet = "GINIindex", col_names = F)
 colnames(gini) <- c("FullName","GINIindex")
 merge_all$FullName[which(merge_all$FullName %ni% unique(gini$FullName))]
 
@@ -199,7 +207,7 @@ dim(merge_all)
 
 ###########################################################################################################################################
 # Urbanization
-urb <- read_excel("./InputData/GHSindex_data_static.xlsx", sheet = "Urbanization", col_names = F)
+urb <- read_excel(xlFile, sheet = "Urbanization", col_names = F)
 
 ctys <- c()
 percUrb <- c()
@@ -244,7 +252,7 @@ merge_all <- merge(merge_all, Urbanization, by.x="FullName", by.y="FullName")
 
 ###########################################################################################################################################
 # Household Structure
-house <- read_excel("./InputData/GHSindex_data_static.xlsx", sheet = "HouseholdStructure", col_names = T)
+house <- read_excel(xlFile, sheet = "HouseholdStructure", col_names = T)
 
 
 merge_all$Ave_household_size <- NA
@@ -291,7 +299,7 @@ dim(merge_all)
 ###########################################################################################################################################
 # Ethnicity Structure
 # https://www.cia.gov/library/publications/resources/the-world-factbook/fields/400.html
-ethnicGroups <- read_excel("./InputData/GHSindex_data_static.xlsx", sheet = "EFindex", col_names = T)
+ethnicGroups <- read_excel(xlFile, sheet = "EFindex", col_names = T)
 colnames(ethnicGroups) <- c("FullName","Year","EFindex")
 
 merge_all$FullName[which(merge_all$FullName %ni% unique(ethnicGroups$FullName))]
@@ -331,7 +339,7 @@ for(i in 1:length(merge_all$FullName)){
 ###########################################################################################################################################
 # Ethnicity Structure
 # https://www.cia.gov/library/publications/resources/the-world-factbook/fields/400.html
-# ethnicGroups <- read_excel("./InputData/GHSindex_data_static.xlsx", sheet = "EthnicityStructure", col_names = F)
+# ethnicGroups <- read_excel(xlFile, sheet = "EthnicityStructure", col_names = F)
 # colnames(ethnicGroups) <- c("FullName","EthnicityString","Note")
 # 
 # merge_all$FullName[which(merge_all$FullName %ni% unique(ethnicGroups$FullName))]
@@ -358,5 +366,12 @@ for(i in 1:length(merge_all$FullName)){
 
 
 # =======
+if(HubeiFlag == T){
+  merge_all$FullName <- as.character(merge_all$FullName)
+  merge_all$FullName[merge_all$FullName=="China"] <- "Hubei"
+  merge_all$ISO3 <- as.character(merge_all$ISO3)
+  merge_all$ISO3[merge_all$ISO3=="CHN"] <- "HUB"
+}
+
 write_csv(merge_all, './InputData/data_static_vars.csv')
 
