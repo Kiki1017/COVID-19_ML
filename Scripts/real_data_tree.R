@@ -19,7 +19,7 @@ incidence_start_point <- 0.3
 # if wee are doing deaths, we want incidence start point to be about 1/20th because that's the approx mortality rate
 if(death_flag==T){incidence_start_point <- incidence_start_point/20}
 count_start_point <- 100
-nLags <- 14
+nLags <- 3
 
 data_clean <- read.csv("./InputData/ML_features.csv")
 data_clean$date <- as.Date(data_clean$date)
@@ -29,10 +29,10 @@ glimpse(data_clean)
 summary(data_clean)
 
 # testing_countries <- c("USA")
-# testing_countries <- c("GBR")
+testing_countries <- c("GBR")
 # testing_countries <- c("BRA")
 # testing_countries <- c("ESP")
-testing_countries <- c("ZAF")
+# testing_countries <- c("ZAF")
 
 # make country lists, these are the ones that we have NPI data collected for
 # training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","CHN","KOR","USA")
