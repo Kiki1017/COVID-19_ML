@@ -29,6 +29,7 @@ randomForestFunction <- function(name,dd){
   fit <- rpart(mod_formula, data = dd_fun, method="anova", #"anova", "poisson", "class" or "exp"
                control=rpart.control(minsplit=2, cp=0.0001))
   fitrf <- randomForest(mod_formula, data = dd_fun, importance = TRUE, na.action = na.omit)
+  return(fitrf)
 }
 
 #---caretFunction---#########################################################################################################################################################################
@@ -103,9 +104,9 @@ caretFunction <- function(name,dd){
   trellis.par.set(caretTheme())
   dotplot(resamps, metric = "MAE")
   dotplot(resamps, metric = "Rsquared")
-  best_model = rf.mod$finalModel
+  best_model_tmp = rf.mod$finalModel
   
-  fitrf <- best_model
+  return(best_model_tmp)
 }
 
 #---initialFlags---#########################################################################################################################################################################
@@ -293,14 +294,14 @@ if(death_flag==F){
   if(incidence_flag==T){
     training_ready_sub2 <- subset(training_ready_sub2, select=-c(confirmed_cum))
     testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(confirmed_cum))
-    randomForestFunction(name="confirmed_cum_per_million",dd="training_ready_sub2")
+    best_model <- randomForestFunction(name="confirmed_cum_per_million",dd="training_ready_sub2")
     # fit <- rpart(confirmed_cum_per_million ~ ., data = training_ready_sub2, method="anova", #"anova", "poisson", "class" or "exp"
     #              control=rpart.control(minsplit=2, cp=0.0001))
     # fitrf <- randomForest(confirmed_cum_per_million ~ ., data = training_ready_sub2, importance = TRUE, na.action = na.omit)
   }else{
     # training_ready_sub2 <- subset(training_ready_sub2, select=-c(confirmed_cum_per_million))
     # testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(confirmed_cum_per_million))
-    randomForestFunction(name="confirmed_cum",dd="training_ready_sub2")
+    best_model <- randomForestFunction(name="confirmed_cum",dd="training_ready_sub2")
     # fit <- rpart(confirmed_cum ~ ., data = training_ready_sub2, method="anova", #"anova", "poisson", "class" or "exp"
     #              control=rpart.control(minsplit=2, cp=0.0001))
     # fitrf <- randomForest(confirmed_cum ~ ., data = training_ready_sub2, importance = TRUE, na.action = na.omit)
@@ -331,14 +332,14 @@ if(death_flag==F){
   if(incidence_flag==T){
     training_ready_sub2 <- subset(training_ready_sub2, select=-c(death_cum))
     testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(death_cum))
-    randomForestFunction(name="death_cum_per_million",dd="training_ready_sub2")
+    best_model <- randomForestFunction(name="death_cum_per_million",dd="training_ready_sub2")
     # fit <- rpart(death_cum_per_million ~ ., data = training_ready_sub2, method="anova", #"anova", "poisson", "class" or "exp"
     #              control=rpart.control(minsplit=2, cp=0.0001))
     # fitrf <- randomForest(death_cum_per_million ~ ., data = training_ready_sub2, importance = TRUE, na.action = na.omit)
   }else{
     # training_ready_sub2 <- subset(training_ready_sub2, select=-c(death_cum_per_million))
     # testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(death_cum_per_million))
-    randomForestFunction(name="death_cum",dd="training_ready_sub2")
+    best_model <- randomForestFunction(name="death_cum",dd="training_ready_sub2")
     # fit <- rpart(death_cum ~ ., data = training_ready_sub2, method="anova", #"anova", "poisson", "class" or "exp"
     #              control=rpart.control(minsplit=2, cp=0.0001))
     # fitrf <- randomForest(death_cum ~ ., data = training_ready_sub2, importance = TRUE, na.action = na.omit)
@@ -366,7 +367,7 @@ if(NPIflag2 == "lastNPI"){
 # testing_ready_pred$Social_Distancing
 
 #---makePrediction---#########################################################################################################################################################################
-p1 <- predict(fitrf, testing_ready_pred[1:(breaker-1),], na.action = na.pass)
+p1 <- predict(best_model, testing_ready_pred[1:(breaker-1),], na.action = na.pass)
 for(i in breaker:nrow(testing_ready_pred)){
   for(l in 1:nLags){
     if(l==1){
@@ -395,20 +396,20 @@ for(i in breaker:nrow(testing_ready_pred)){
     }
   }
   if(incidence_flag==T && death_flag==F){
-    testing_ready_pred[i,c(paste0("confirmed_cum_per_million"))] <- predict(fitrf, testing_ready_pred[i,], na.action = na.pass)
+    testing_ready_pred[i,c(paste0("confirmed_cum_per_million"))] <- predict(best_model, testing_ready_pred[i,], na.action = na.pass)
   }else if(incidence_flag==T && death_flag==T){
-    testing_ready_pred[i,c(paste0("death_cum_per_million"))] <- predict(fitrf, testing_ready_pred[i,], na.action = na.pass)
+    testing_ready_pred[i,c(paste0("death_cum_per_million"))] <- predict(best_model, testing_ready_pred[i,], na.action = na.pass)
   }else if(incidence_flag==F && death_flag==F){
-    testing_ready_pred[i,c(paste0("confirmed_cum"))] <- predict(fitrf, testing_ready_pred[i,], na.action = na.pass)
+    testing_ready_pred[i,c(paste0("confirmed_cum"))] <- predict(best_model, testing_ready_pred[i,], na.action = na.pass)
   }else if(incidence_flag==F && death_flag==T){
-    testing_ready_pred[i,c(paste0("death_cum"))] <- predict(fitrf, testing_ready_pred[i,], na.action = na.pass)
+    testing_ready_pred[i,c(paste0("death_cum"))] <- predict(best_model, testing_ready_pred[i,], na.action = na.pass)
   }
   # testing_ready_pred[(breaker-5):(i),grep("confirmed_cum_per_million", colnames(testing_ready_pred))]
   if(i==breaker){
-    pN <- predict(fitrf, testing_ready_pred[i,], na.action = na.pass)
+    pN <- predict(best_model, testing_ready_pred[i,], na.action = na.pass)
     pAll <- c(p1,pN)
   }else{
-    pN <- predict(fitrf, testing_ready_pred[i,], na.action = na.pass)
+    pN <- predict(best_model, testing_ready_pred[i,], na.action = na.pass)
     pAll <- c(pAll,pN)
   }
 }
