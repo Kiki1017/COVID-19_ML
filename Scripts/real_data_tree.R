@@ -9,18 +9,27 @@ library(ggplot2)
 library(rpart.plot)
 library(randomForest)
 library(randomcoloR)
+#
+library(gridExtra)
+library(grid)
+library(lattice)
+library(ggpubr)
 
-
+#---initialFlags---#########################################################################################################################################################################
 # TRUE if you want to scale by population
 incidence_flag <- T
 # TRUE if you want to do deaths instead of cases
 death_flag <- F
 incidence_start_point <- 0.3
-# if wee are doing deaths, we want incidence start point to be about 1/20th because that's the approx mortality rate
-if(death_flag==T){incidence_start_point <- incidence_start_point/20}
+# if we are doing deaths, we want incidence start point to be about 5.9% of the case one becuase that's the approx mortality rate
+if(death_flag==T){incidence_start_point <- incidence_start_point*(5.9/100)}
 count_start_point <- 100
-nLags <- 3
+nLags <- 7
+projectionTime <- 10
+NPIflag1 <- "autofill"
+NPIflag2 <- "lastNPI"
 
+#---dataSetup---#########################################################################################################################################################################
 data_clean <- read.csv("./InputData/ML_features.csv")
 data_clean$date <- as.Date(data_clean$date)
 
@@ -29,20 +38,19 @@ glimpse(data_clean)
 summary(data_clean)
 
 # testing_countries <- c("USA")
-testing_countries <- c("GBR")
+# testing_countries <- c("GBR")
 # testing_countries <- c("BRA")
-# testing_countries <- c("ESP")
+testing_countries <- c("ESP")
 # testing_countries <- c("ZAF")
 
 # make country lists, these are the ones that we have NPI data collected for
-# training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","CHN","KOR","USA")
-# training_countries_all <- c("CHN","KOR","USA","GBR","ESP","IRN","FRA","ANT","CHE","AUT","BRA","DEU")
-# training_countries_all <- c("CHN","KOR","ITA","USA","ESP","BRA","GBR")
-training_countries_all <- c("HUB","KOR","ITA","USA","ESP","BRA","GBR")
-training_countries <- training_countries_all[which(training_countries_all != testing_countries)]
-# training_countries <- c("CHN","KOR","ITA","USA","ESP","BRA")
 
-# subset to 100 cumulative cases as starting time threshold and add time column
+training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","HUB","KOR","USA","SWE","AUT","CHE","DEU","FRA")
+# training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","USA","SWE","AUT","CHE","DEU","FRA")
+training_countries <- training_countries_all[which(training_countries_all != testing_countries)]
+
+#---trainingTestingDataFrames---#########################################################################################################################################################################
+# create training dataframe
 for(i in 1:length(training_countries)){
   training_subset <- subset(data_clean,ISO3 %in% training_countries[i])
   if(incidence_flag==T){
@@ -50,7 +58,7 @@ for(i in 1:length(training_countries)){
   }else{
     start <- which(training_subset$confirmed_cum >= count_start_point)[1]
   }
-
+  
   training_subset_aligned <- training_subset[start:nrow(training_subset),]
   training_subset_aligned$time <- c(1:nrow(training_subset_aligned))
   if(i==1){
@@ -59,9 +67,7 @@ for(i in 1:length(training_countries)){
     training_ready <- as.data.frame(rbind(training_ready,training_subset_aligned))
   }
 }
-
-projectionTime <- 14
-
+# create testing dataframe
 for(i in 1:length(testing_countries)){
   testing_subset <- subset(data_clean,ISO3 %in% testing_countries[i])
   if(incidence_flag==T){
@@ -84,26 +90,55 @@ for(i in 1:length(testing_countries)){
   }
 }
 
+#---NPIflag1---#########################################################################################################################################################################
+# Here we write a little loop that takes care of the fact that the Johns hopkins count data is 
+# Updated much more frequently than the NPI data.  So 
+# setting the NPIflag1 to "autofill" is our method of saying that we want to fill all the NAs in the time period with the last empirical time points' NPI values
+# We will worry about the NPIflag2 later to specify if we want to fill the projection timeperiod the same way
+# NPIflag1 <- "autofill"
+
+peek_at_NPIs_training1 <- training_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(training_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border",names(training_ready))])]
+NPInames <- names(training_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border",names(training_ready))]
+if(NPIflag1 == "autofill"){
+  for(i in 1:nrow(training_ready)){
+    for(j in NPInames){
+      if(is.na(training_ready[[j]][i])){training_ready[[j]][i] <- training_ready[[j]][i-1]}
+    }
+  }
+}
+peek_at_NPIs_training2 <- training_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(training_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border",names(training_ready))])]
+
+peek_at_NPIs_testing1 <- testing_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(testing_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border",names(testing_ready))])]
+NPInames <- names(testing_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border",names(testing_ready))]
+if(NPIflag1 == "autofill"){
+  for(i in 1:(nrow(testing_ready)-projectionTime)){
+    for(j in NPInames){
+      if(is.na(testing_ready[[j]][i])){testing_ready[[j]][i] <- testing_ready[[j]][i-1]}
+    }
+  }
+}
+peek_at_NPIs_testing2 <- testing_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(testing_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border",names(testing_ready))])]
+
+
 #---first plot---#########################################################################################################################################################################
 # lineColors <- c("firebrick","darkgoldenrod1", "darkviolet", "limegreen", "dodgerblue")
-
 plot1 <- ggplot() 
 if(incidence_flag==T && death_flag==F){
   plot1 <- plot1 +
-  geom_line(data=training_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size=0.8,alpha=.7)+
-  # geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1) +
-  geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size = 3, colour = 'red', alpha = 0.1) +
-  geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size = 2, colour = 'red', alpha = 0.2) +
-  geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size = 1, colour = 'red', alpha = 0.5) +
-  labs(x=paste0("Days Since ",incidence_start_point," Cumulative Counts per Million"), y = "Confirmed Cumulative Cases per Million", title="")
+    geom_line(data=training_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size=0.8,alpha=.7)+
+    # geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1) +
+    geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size = 3, colour = 'red', alpha = 0.1) +
+    geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size = 2, colour = 'red', alpha = 0.2) +
+    geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size = 1, colour = 'red', alpha = 0.5) +
+    labs(x=paste0("Days Since ",incidence_start_point," Cumulative Counts per Million"), y = "Confirmed Cumulative Cases per Million", title="")
 }else if(incidence_flag==T && death_flag==T){
   plot1 <- plot1 +
-  geom_line(data=training_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size=0.8,alpha=.7)+
-  # geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1)+
-  geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size = 3, colour = 'red', alpha = 0.1) +
-  geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size = 2, colour = 'red', alpha = 0.2) +
-  geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size = 1, colour = 'red', alpha = 0.5) +
-  labs(x=paste0("Days Since ",incidence_start_point," Cumulative Deaths per Million"), y = "Confirmed Cumulative Deaths per Million", title="")
+    geom_line(data=training_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size=0.8,alpha=.7)+
+    # geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1)+
+    geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size = 3, colour = 'red', alpha = 0.1) +
+    geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size = 2, colour = 'red', alpha = 0.2) +
+    geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size = 1, colour = 'red', alpha = 0.5) +
+    labs(x=paste0("Days Since ",incidence_start_point," Cumulative Deaths per Million"), y = "Confirmed Cumulative Deaths per Million", title="")
 }else if(incidence_flag==F && death_flag==F){
   plot1 <- plot1 +
     geom_line(data=training_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size=0.8,alpha=.7)+
@@ -134,15 +169,13 @@ plot1 <- plot1 +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
         panel.background = element_blank(), axis.line = element_line(colour = "black"))
 
-# print(plot1)
-
 #---training tree---#########################################################################################################################################################################
 str(training_ready)
 str(testing_ready)
 
 # Create a Random Forest model with default parameters
 if(death_flag==F){
-  training_ready_sub2 <- subset(training_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName))
+  training_ready_sub2 <- subset(training_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered))
   training_ready_sub2 <- training_ready_sub2[,grep("death", colnames(training_ready_sub2),invert = T)]
   training_ready_sub2 <- training_ready_sub2[,grep("MalePercent", colnames(training_ready_sub2),invert = T)]  
   training_ready_sub2 <- training_ready_sub2[,grep("FemalePercent", colnames(training_ready_sub2),invert = T)]
@@ -152,8 +185,8 @@ if(death_flag==F){
   training_ready_sub2 <- subset(training_ready_sub2, select=-c(Percent_house_Multi_generation,Percent_house_Three_generation,Percent_house_Skip_generation,Num_Tests_cum))
   training_ready_sub2 %<>% mutate_if(is.factor,as.character)  
   training_ready_sub2 %<>% mutate_if(is.character,as.numeric)
-  ###############
-  testing_ready_sub2 <- subset(testing_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName))
+  # remove more columns we don't want in the model
+  testing_ready_sub2 <- subset(testing_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered))
   testing_ready_sub2 <- testing_ready_sub2[,grep("death", colnames(testing_ready_sub2),invert = T)]
   testing_ready_sub2 <- testing_ready_sub2[,grep("MalePercent", colnames(testing_ready_sub2),invert = T)]  
   testing_ready_sub2 <- testing_ready_sub2[,grep("FemalePercent", colnames(testing_ready_sub2),invert = T)]
@@ -178,9 +211,8 @@ if(death_flag==F){
     # rpart.plot(fit, main="Tree")
     fitrf <- randomForest(confirmed_cum ~ ., data = training_ready_sub2, importance = TRUE, na.action = na.omit)
   }
-
 }else if(death_flag==T){
-  training_ready_sub2 <- subset(training_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName))
+  training_ready_sub2 <- subset(training_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered))
   training_ready_sub2 <- training_ready_sub2[,grep("confirmed", colnames(training_ready_sub2),invert = T)]
   training_ready_sub2 <- training_ready_sub2[,grep("MalePercent", colnames(training_ready_sub2),invert = T)]  
   training_ready_sub2 <- training_ready_sub2[,grep("FemalePercent", colnames(training_ready_sub2),invert = T)]
@@ -190,8 +222,8 @@ if(death_flag==F){
   training_ready_sub2 <- subset(training_ready_sub2, select=-c(Percent_house_Multi_generation,Percent_house_Three_generation,Percent_house_Skip_generation,Num_Tests_cum))
   training_ready_sub2 %<>% mutate_if(is.factor,as.character)  
   training_ready_sub2 %<>% mutate_if(is.character,as.numeric)
-  ###################
-  testing_ready_sub2 <- subset(testing_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName))
+  # remove more columns we don't want in the model
+  testing_ready_sub2 <- subset(testing_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered))
   testing_ready_sub2 <- testing_ready_sub2[,grep("confirmed", colnames(testing_ready_sub2),invert = T)]
   testing_ready_sub2 <- testing_ready_sub2[,grep("MalePercent", colnames(testing_ready_sub2),invert = T)]  
   testing_ready_sub2 <- testing_ready_sub2[,grep("FemalePercent", colnames(testing_ready_sub2),invert = T)]
@@ -217,86 +249,27 @@ if(death_flag==F){
   }
 }
 
-
-# fit <- rpart(confirmed_cum_per_million ~ time+
-#                confirmed_cum_per_million_lag_01+
-#                confirmed_cum_per_million_lag_02+
-#                confirmed_cum_per_million_lag_03+
-#                confirmed_cum_per_million_lag_04+
-#                confirmed_cum_per_million_lag_05+
-#                confirmed_cum_per_million_lag_06+
-#                confirmed_cum_per_million_lag_07+
-#                confirmed_cum_per_million_lag_08+
-#                confirmed_cum_per_million_lag_09+
-#                confirmed_cum_per_million_lag_10+
-#                confirmed_cum_per_million_lag_11+
-#                confirmed_cum_per_million_lag_12+
-#                confirmed_cum_per_million_lag_13+
-#                confirmed_cum_per_million_lag_14+
-#                Social_Distancing +
-#                Quaranting_Cases +
-#                Close_Border +
-#                GHS_Prevent+
-#                GHS_Detect+
-#                GHS_Respond+
-#                GHS_Health+
-#                GHS_Norms+
-#                GHS_Risk+
-#                GDP_bill+
-#                GDP_percapita+
-#                Population_mill+
-#                HumanDevelopmentIndex_2018+
-#                EIUDemocracyIndexScore_2019+
-#                UNOnlineServicesIndexScore_2018+
-#                GlobalPeaceIndex+
-#                CorruptionsPerceptionIndex_2018+
-#                HumanCapitalIndex_2017+
-#                SDGIndexScore_2018+
-#                age_0_14_Percent+
-#                age_15_24_Percent+
-#                age_25_54_Percent+
-#                age_55_64_Percent+
-#                age_65_plus_Percent+
-#                PopulationGrowthRate+
-#                PopulationSmoking_male+
-#                PopulationSmoking_female+
-#                GINIindex+
-#                PercentUrban+
-#                RateUrbanization+
-#                Ave_household_size+
-#                Percent_house_Nuclear+
-#                Percent_house_Multi_generation+
-#                Percent_house_Three_generation+
-#                Percent_house_Skip_generation+
-#                EFindex,
-#              data=training_ready, 
-#              method="anova", #"anova", "poisson", "class" or "exp"
-#              control=rpart.control(minsplit=2, cp=0.0001))
-# summary(fit)
-# rpart.plot(fit, main="Tree")
-
-
-# setting the NPIflag to "lastNPI" is our method of saying that we want to fill all the NAs in the forecasting period with the last empirical time points' NPI values
-NPIflag <- "lastNPI"
+#---NPIflag2---#########################################################################################################################################################################
+# setting the NPIflag2 to "lastNPI" is our method of saying that we want to fill all the NAs in the forecasting period with the last empirical time points' NPI values
+# NPIflag2 <- "lastNPI"
 testing_ready_pred <- testing_ready_sub2
 breaker <- nrow(testing_ready_pred)-projectionTime+1
 # testing_ready_pred[(breaker-1):(breaker+1),grep("confirmed_cum_per_million", colnames(testing_ready_pred))]
 
 # Note this code assumes that there are no NAs present in the NPI data
-if(NPIflag == "lastNPI"){
-  testing_ready_pred$Social_Distancing[head(which(!is.na(testing_ready_pred$Social_Distancing)),n=1):tail(which(is.na(testing_ready_pred$Social_Distancing)),n=1)] <- tail(testing_ready_pred$Social_Distancing[which(!is.na(testing_ready_pred$Social_Distancing))],n=1)
-  testing_ready_pred$Quaranting_Cases[head(which(!is.na(testing_ready_pred$Quaranting_Cases)),n=1):tail(which(is.na(testing_ready_pred$Quaranting_Cases)),n=1)] <- tail(testing_ready_pred$Quaranting_Cases[which(!is.na(testing_ready_pred$Quaranting_Cases))],n=1)
-  testing_ready_pred$Close_Border[head(which(!is.na(testing_ready_pred$Close_Border)),n=1):tail(which(is.na(testing_ready_pred$Close_Border)),n=1)] <- tail(testing_ready_pred$Close_Border[which(!is.na(testing_ready_pred$Close_Border))],n=1)
+NPInames <- names(testing_ready_pred)[grep("Social_Distancing|Quaranting_Cases|Close_Border",names(testing_ready_pred))]
+if(NPIflag2 == "lastNPI"){
+  for(i in breaker:nrow(testing_ready_pred)){
+    for(j in NPInames){
+      if(is.na(testing_ready_pred[[j]][i])){testing_ready_pred[[j]][i] <- testing_ready_pred[[j]][i-1]}
+    }
+  }
 }
-
 # Check before and after if you so desire, for the filling in of NPI data in the forecasting period.
 # testing_ready$Social_Distancing
 # testing_ready_pred$Social_Distancing
-# testing_ready$Quaranting_Cases
-# testing_ready_pred$Quaranting_Cases
-# testing_ready$Close_Border
-# testing_ready_pred$Close_Border
 
+#---makePrediction---#########################################################################################################################################################################
 p1 <- predict(fitrf, testing_ready_pred[1:(breaker-1),], na.action = na.pass)
 for(i in breaker:nrow(testing_ready_pred)){
   for(l in 1:nLags){
@@ -310,7 +283,7 @@ for(i in breaker:nrow(testing_ready_pred)){
       }else if(incidence_flag==F && death_flag==T){
         testing_ready_pred[i,c(paste0("death_cum_lag_01"))] <- testing_ready_pred[i-1,c(paste0("death_cum"))]
       }
-      if(NPIflag != "lastNPI"){
+      if(NPIflag2 != "lastNPI"){
         # Some other forecasting of the NPI data
       }
     }else{
@@ -344,6 +317,7 @@ for(i in breaker:nrow(testing_ready_pred)){
   }
 }
 
+# Collect the data to be rady for ggplot
 pAll <- as.data.frame(pAll)
 pAll$time <- testing_ready_pred$time
 
@@ -357,6 +331,7 @@ if(incidence_flag==T && death_flag==F){
   plot1Data_tmp <- testing_ready[,c("FullName","time","death_cum")]
 }
 
+# Organize the data to be rady for ggplot
 plot1Data <- merge(pAll,plot1Data_tmp,by="time")
 colnames(plot1Data) <- c("time","prediction","country","actual")
 plot1Data <- plot1Data[order(plot1Data$time),]
@@ -365,6 +340,7 @@ plot1Data$actual <- as.numeric(plot1Data$actual)
 plot1Data$country <- as.character(plot1Data$country)
 str(plot1Data)
 
+# Reshape the data to be rady for ggplot
 m1 <- reshape2::melt(plot1Data,id=c("country","time"))
 m1$time <- as.numeric(m1$time)
 m1$value <- as.numeric(m1$value)
@@ -373,9 +349,7 @@ m1$country <- as.factor(m1$country)
 str(m1)
 m1 <- m1[order(m1$time),]
 
-
-#---plot prediction---#############
-
+#---plotPrediction---#########################################################################################################################################################################
 plot_predict <- ggplot() 
 plot_predict <- plot_predict +
   # geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size=0.8,alpha=.7)+
@@ -383,9 +357,9 @@ plot_predict <- plot_predict +
   geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size = 2, colour = 'red', alpha = 0.2) +
   geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size = 1, colour = 'red', alpha = 0.5) +
   geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size=0.85, colour = 'red', linetype = "3313",alpha=.7)
-  # geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size = 3, colour = 'red', alpha = 0.1, linetype = "3313") +
-  # geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size = 2, colour = 'red', alpha = 0.2, linetype = "3313") +
-  # geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size = 1, colour = 'red', alpha = 0.5, linetype = "3313") +
+# geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size = 3, colour = 'red', alpha = 0.1, linetype = "3313") +
+# geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size = 2, colour = 'red', alpha = 0.2, linetype = "3313") +
+# geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size = 1, colour = 'red', alpha = 0.5, linetype = "3313") +
 if(incidence_flag==T && death_flag==F){
   plot_predict <- plot_predict +
     labs(x=paste0("Days Since ",incidence_start_point," Cumulative Counts per Million"), y = "Confirmed Cumulative Cases per Million", title="")
@@ -413,10 +387,7 @@ plot_predict <- plot_predict +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
         panel.background = element_blank(), axis.line = element_line(colour = "black"))
 
-# print(plot_predict)
-
-
-
+#---variableImportancePlot---#########################################################################################################################################################################
 # Plot variable importance
 df <- data.frame(imp = fit$variable.importance)
 df2 <- df %>% 
@@ -432,22 +403,12 @@ plot_varimp <- ggplot2::ggplot(df2) +
   coord_flip() +
   theme_bw()
 
-
-###################################
-
-library(gridExtra)
-library(grid)
-library(ggplot2)
-library(lattice)
-library(ggpubr)
-
-
+#---cumulativePlot---#########################################################################################################################################################################
 gl <- list(plot1,plot_predict,plot_varimp)
-
 grid.arrange(grobs = gl, top = textGrob(paste0(testing_ready$FullName[1]), gp=gpar(fontsize=15)), layout_matrix = rbind(c(1,1,1,1,2,2,2,2),
-                                               c(1,1,1,1,2,2,2,2),
-                                               c(1,1,1,1,2,2,2,2),
-                                               c(3,3,3,3,3,3,3,3),
-                                               c(3,3,3,3,3,3,3,3),
-                                               c(3,3,3,3,3,3,3,3)))
+                                                                                                                        c(1,1,1,1,2,2,2,2),
+                                                                                                                        c(1,1,1,1,2,2,2,2),
+                                                                                                                        c(3,3,3,3,3,3,3,3),
+                                                                                                                        c(3,3,3,3,3,3,3,3),
+                                                                                                                        c(3,3,3,3,3,3,3,3)))
 
