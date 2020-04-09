@@ -14,6 +14,99 @@ library(gridExtra)
 library(grid)
 library(lattice)
 library(ggpubr)
+#
+library(caret)
+library(doParallel)
+library(magrittr)
+library(dplyr)
+library(gbm)
+
+#---randomForestFunction---#########################################################################################################################################################################
+
+randomForestFunction <- function(name,dd){
+  dd_fun <- eval(parse(text=paste(dd)))  
+  mod_formula <- as.formula(paste(name,"~","."))
+  fit <- rpart(mod_formula, data = dd_fun, method="anova", #"anova", "poisson", "class" or "exp"
+               control=rpart.control(minsplit=2, cp=0.0001))
+  fitrf <- randomForest(mod_formula, data = dd_fun, importance = TRUE, na.action = na.omit)
+}
+
+#---caretFunction---#########################################################################################################################################################################
+
+caretFunction <- function(name,dd){
+  dd_fun <- eval(parse(text=paste(dd))) 
+  mod_formula <- as.formula(paste(name,"~","."))
+  
+  # implemnting CARET
+  fitControl <- trainControl(## 10-fold CV
+    method = "repeatedcv",
+    number = 10,
+    ## repeated ten times
+    repeats = 10,
+    allowParallel = TRUE)
+  gbmGrid <-  expand.grid(interaction.depth = c(1, 5, 9), 
+                          n.trees = (1:30)*25, 
+                          shrinkage = c(0.1, 0.01),
+                          n.minobsinnode = c(20))
+  
+  nrow(gbmGrid)
+  
+  set.seed(825)
+  gbm.mod <- train(mod_formula,
+                   data = training_ready_sub2, 
+                   method = "gbm", 
+                   trControl = fitControl, 
+                   verbose = FALSE, 
+                   ## Now specify the exact models 
+                   ## to evaluate:
+                   tuneGrid = gbmGrid,
+                   na.action = na.pass)
+  gbm.mod
+  
+  earth.pois.mod <- train(confirmed_cum_per_million ~ .,
+                          data = training_ready_sub2,
+                          method = "earth",
+                          glm=list(family=poisson),
+                          trControl = fitControl,
+                          na.action = na.exclude)
+  earth.pois.mod
+  gam.mod <- train(confirmed_cum_per_million ~ .,
+                   data = training_ready_sub2,
+                   method = "gam",
+                   trControl = fitControl,
+                   tuneLength=tuneLength.num,
+                   na.action = na.exclude)
+  gam.mod
+  party.mod <- train(confirmed_cum_per_million ~ .,
+                     data = training_ready_sub2,
+                     method = "ctree",
+                     trControl = fitControl,
+                     tuneLength=tuneLength.num,
+                     na.action = na.exclude)
+  party.mod
+  
+  rf.mod <- train(confirmed_cum_per_million ~ .,
+                  data = training_ready_sub2,
+                  method = "rf",
+                  trControl = fitControl,
+                  tuneLength=tuneLength.num,
+                  na.action = na.exclude)
+  resamps <- resamples(list(gbm=gbm.mod,
+                            gam=gam.mod,
+                            rf=rf.mod,
+                            party=party.mod))
+  #earth.pois=earth.pois.mod))
+  resamps
+  ss <- summary(resamps)
+  library(lattice)
+  
+  trellis.par.set(caretTheme())
+  dotplot(resamps, metric = "MAE")
+  dotplot(resamps, metric = "Rsquared")
+  best_model = rf.mod$finalModel
+  
+  fitrf <- best_model
+}
 
 #---initialFlags---#########################################################################################################################################################################
 # TRUE if you want to scale by population
@@ -38,9 +131,9 @@ glimpse(data_clean)
 summary(data_clean)
 
 # testing_countries <- c("USA")
-# testing_countries <- c("GBR")
+testing_countries <- c("GBR")
 # testing_countries <- c("BRA")
-testing_countries <- c("ESP")
+# testing_countries <- c("ESP")
 # testing_countries <- c("ZAF")
 
 # make country lists, these are the ones that we have NPI data collected for
@@ -169,7 +262,7 @@ plot1 <- plot1 +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
         panel.background = element_blank(), axis.line = element_line(colour = "black"))
 
-#---training tree---#########################################################################################################################################################################
+#---tree_Models---#########################################################################################################################################################################
 str(training_ready)
 str(testing_ready)
 
@@ -200,16 +293,17 @@ if(death_flag==F){
   if(incidence_flag==T){
     training_ready_sub2 <- subset(training_ready_sub2, select=-c(confirmed_cum))
     testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(confirmed_cum))
-    fit <- rpart(confirmed_cum_per_million ~ ., data = training_ready_sub2, method="anova", #"anova", "poisson", "class" or "exp"
-                 control=rpart.control(minsplit=2, cp=0.0001))
-    fitrf <- randomForest(confirmed_cum_per_million ~ ., data = training_ready_sub2, importance = TRUE, na.action = na.omit)
+    randomForestFunction(name="confirmed_cum_per_million",dd="training_ready_sub2")
+    # fit <- rpart(confirmed_cum_per_million ~ ., data = training_ready_sub2, method="anova", #"anova", "poisson", "class" or "exp"
+    #              control=rpart.control(minsplit=2, cp=0.0001))
+    # fitrf <- randomForest(confirmed_cum_per_million ~ ., data = training_ready_sub2, importance = TRUE, na.action = na.omit)
   }else{
     # training_ready_sub2 <- subset(training_ready_sub2, select=-c(confirmed_cum_per_million))
     # testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(confirmed_cum_per_million))
-    fit <- rpart(confirmed_cum ~ ., data = training_ready_sub2, method="anova", #"anova", "poisson", "class" or "exp"
-                 control=rpart.control(minsplit=2, cp=0.0001))
-    # rpart.plot(fit, main="Tree")
-    fitrf <- randomForest(confirmed_cum ~ ., data = training_ready_sub2, importance = TRUE, na.action = na.omit)
+    randomForestFunction(name="confirmed_cum",dd="training_ready_sub2")
+    # fit <- rpart(confirmed_cum ~ ., data = training_ready_sub2, method="anova", #"anova", "poisson", "class" or "exp"
+    #              control=rpart.control(minsplit=2, cp=0.0001))
+    # fitrf <- randomForest(confirmed_cum ~ ., data = training_ready_sub2, importance = TRUE, na.action = na.omit)
   }
 }else if(death_flag==T){
   training_ready_sub2 <- subset(training_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered))
@@ -237,15 +331,17 @@ if(death_flag==F){
   if(incidence_flag==T){
     training_ready_sub2 <- subset(training_ready_sub2, select=-c(death_cum))
     testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(death_cum))
-    fit <- rpart(death_cum_per_million ~ ., data = training_ready_sub2, method="anova", #"anova", "poisson", "class" or "exp"
-                 control=rpart.control(minsplit=2, cp=0.0001))
-    fitrf <- randomForest(death_cum_per_million ~ ., data = training_ready_sub2, importance = TRUE, na.action = na.omit)
+    randomForestFunction(name="death_cum_per_million",dd="training_ready_sub2")
+    # fit <- rpart(death_cum_per_million ~ ., data = training_ready_sub2, method="anova", #"anova", "poisson", "class" or "exp"
+    #              control=rpart.control(minsplit=2, cp=0.0001))
+    # fitrf <- randomForest(death_cum_per_million ~ ., data = training_ready_sub2, importance = TRUE, na.action = na.omit)
   }else{
     # training_ready_sub2 <- subset(training_ready_sub2, select=-c(death_cum_per_million))
     # testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(death_cum_per_million))
-    fit <- rpart(death_cum ~ ., data = training_ready_sub2, method="anova", #"anova", "poisson", "class" or "exp"
-                 control=rpart.control(minsplit=2, cp=0.0001))
-    fitrf <- randomForest(death_cum ~ ., data = training_ready_sub2, importance = TRUE, na.action = na.omit)
+    randomForestFunction(name="death_cum",dd="training_ready_sub2")
+    # fit <- rpart(death_cum ~ ., data = training_ready_sub2, method="anova", #"anova", "poisson", "class" or "exp"
+    #              control=rpart.control(minsplit=2, cp=0.0001))
+    # fitrf <- randomForest(death_cum ~ ., data = training_ready_sub2, importance = TRUE, na.action = na.omit)
   }
 }
 
@@ -356,7 +452,7 @@ plot_predict <- plot_predict +
   geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size = 3, colour = 'red', alpha = 0.1) +
   geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size = 2, colour = 'red', alpha = 0.2) +
   geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size = 1, colour = 'red', alpha = 0.5) +
-  geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size=0.85, colour = 'red', linetype = "3313",alpha=.7)
+  geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size=0.95, colour = 'limegreen', linetype = "3313",alpha=.7)
 # geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size = 3, colour = 'red', alpha = 0.1, linetype = "3313") +
 # geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size = 2, colour = 'red', alpha = 0.2, linetype = "3313") +
 # geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size = 1, colour = 'red', alpha = 0.5, linetype = "3313") +
