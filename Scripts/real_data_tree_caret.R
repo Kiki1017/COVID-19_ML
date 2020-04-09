@@ -352,8 +352,10 @@ if(NPIflag == "lastNPI"){
 # testing_ready_pred$Quaranting_Cases
 # testing_ready$Close_Border
 # testing_ready_pred$Close_Border
+best_model
+# p1 <- predict(fitrf, testing_ready_pred[1:(breaker-1),], na.action = na.pass)
+p1 <- predict(best_model, testing_ready_pred[1:(breaker-1),], na.action = na.exclude)
 
-p1 <- predict(fitrf, testing_ready_pred[1:(breaker-1),], na.action = na.pass)
 for(i in breaker:nrow(testing_ready_pred)){
   for(l in 1:nLags){
     if(l==1){
