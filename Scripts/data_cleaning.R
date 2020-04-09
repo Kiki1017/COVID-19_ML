@@ -77,12 +77,37 @@ meta_data <- sheets_get(ugly_url)
 npi_countries <- as.vector(unlist(meta_data$sheets[,1]))
 npi_countries <- npi_countries[c(-1,-2)]
 
+# function to create lag factors for a country's time series
+create_lag <- function(country_ts, num=10, incidence=T){
+  # creating lag variables for number of reported cases, deaths, and recovered
+  lags <- seq(num)   # set the number of lag factors here
+  lag_names <- paste("lag", formatC(lags, width = nchar(max(lags)), flag = "0"), 
+                     sep = "_")
+  lag_functions <- setNames(paste("dplyr::lag(., ", lags, ")"), lag_names)
+  return(country_df)
+}
+
 # Extract data from google sheets into a dataframe
 data_npi <- data.frame()
 for(i in 1:length(npi_countries)){
   npi_df_i <- read_sheet(ugly_url, sheet = npi_countries[i]) %>%
-    mutate(date = ymd(date))
+    mutate(date = ymd(date)) %>%
+    # add lag factors
+    mutate(Social_Distancing_Lag_3 = lag(Social_Distancing, n=3)) %>%
+    mutate(Social_Distancing_Lag_7 = lag(Social_Distancing, n=7)) %>%
+    mutate(Social_Distancing_Lag_10 = lag(Social_Distancing, n=10)) %>%
+    mutate(Social_Distancing_Lag_14 = lag(Social_Distancing, n=14)) %>%
+    mutate(Quaranting_Cases_Lag_3 = lag(Quaranting_Cases, n=3)) %>%
+    mutate(Quaranting_Cases_Lag_7 = lag(Quaranting_Cases, n=7)) %>%
+    mutate(Quaranting_Cases_Lag_10 = lag(Quaranting_Cases, n=10)) %>%
+    mutate(Quaranting_Cases_Lag_14 = lag(Quaranting_Cases, n=14)) %>%
+    mutate(Close_Border_Lag_3 = lag(Close_Border, n=3)) %>%
+    mutate(Close_Border_Lag_7 = lag(Close_Border, n=7)) %>%
+    mutate(Close_Border_Lag_10 = lag(Close_Border, n=10)) %>%
+    mutate(Close_Border_Lag_14 = lag(Close_Border, n=14))
   data_npi <- bind_rows(data_npi,npi_df_i)
+  # Don't overload API, so chill for second.
+  Sys.sleep(1)
 }
 glimpse(data_npi)
 summary(data_npi)
