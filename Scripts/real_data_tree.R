@@ -138,6 +138,7 @@ caretFunction <- function(name,dd, num_cores = 8){
 #---initialFlags---#########################################################################################################################################################################
 # TRUE if you want to evaluate multiple models
 caret_flag <- T
+
 # TRUE if you want to scale by population
 incidence_flag <- T
 # TRUE if you want to do deaths instead of cases
@@ -534,6 +535,7 @@ plot_predict <- plot_predict +
 
 #---variableImportancePlot---#########################################################################################################################################################################
 # Plot variable importance
+
 if(caret_flag==T){
   df <- data.frame(imp = best_model[["importance"]])
   colnames(df) = c('imp')
@@ -541,6 +543,7 @@ if(caret_flag==T){
 }else{
   df <- data.frame(imp = best_model[["importanceSD"]])
 }
+
 df2 <- df %>% 
   tibble::rownames_to_column() %>% 
   dplyr::rename("variable" = rowname) %>% 
