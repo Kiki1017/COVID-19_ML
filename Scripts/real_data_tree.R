@@ -27,6 +27,8 @@ randomForestFunction <- function(name,dd){
   # enable parallel processing
   dd_fun <- eval(parse(text=paste(dd)))  
   mod_formula <- as.formula(paste(name,"~","."))
+  # mod_formula <- as.formula(paste(name,"~","."," -time"))
+  as.formula(paste(name,"~","."," -time"))
   fit <- rpart(mod_formula, data = dd_fun, method="anova", #"anova", "poisson", "class" or "exp"
                control=rpart.control(minsplit=2, cp=0.0001))
   fitrf <- randomForest(mod_formula, data = dd_fun, importance = TRUE, na.action = na.omit)
@@ -35,8 +37,8 @@ randomForestFunction <- function(name,dd){
 
 #---caretFunction---#########################################################################################################################################################################
 # debugging
-# name="confirmed_cum_per_million"
-# dd="training_ready_sub2"
+name="confirmed_cum_per_million"
+dd="training_ready_sub2"
 
 caretFunction <- function(name,dd, num_cores = 8){
   # enable parallel processing
@@ -118,7 +120,9 @@ caretFunction <- function(name,dd, num_cores = 8){
   
   trellis.par.set(caretTheme())
   # dotplot(resamps, metric = "MAE")
-  dotplot(resamps, metric = "RMSE")
+  x = dotplot(resamps, metric = "RMSE")
+  x
+  print(x)
   
   # compare models based upon:
   comp_metric = 'RMSE'
@@ -137,7 +141,7 @@ caretFunction <- function(name,dd, num_cores = 8){
 
 #---initialFlags---#########################################################################################################################################################################
 # TRUE if you want to evaluate multiple models
-caret_flag <- T
+caret_flag <- F
 
 # TRUE if you want to scale by population
 incidence_flag <- T
@@ -147,8 +151,8 @@ incidence_start_point <- 0.3
 # if we are doing deaths, we want incidence start point to be about 5.9% of the case one becuase that's the approx mortality rate
 if(death_flag==T){incidence_start_point <- incidence_start_point*(5.9/100)}
 count_start_point <- 100
-nLags <- 7
-projectionTime <- 10
+nLags <- 10
+projectionTime <- 5
 NPIflag1 <- "autofill"
 NPIflag2 <- "lastNPI"
 
@@ -161,10 +165,10 @@ glimpse(data_clean)
 summary(data_clean)
 
 # testing_countries <- c("USA")
-testing_countries <- c("GBR")
+testing_countries <- c("ITA")
 # testing_countries <- c("BRA")
 # testing_countries <- c("ESP")
-# testing_countries <- c("ZAF")
+# testing_countries <- c("HUB")
 
 # make country lists, these are the ones that we have NPI data collected for
 
@@ -566,3 +570,7 @@ grid.arrange(grobs = gl, top = textGrob(paste0(testing_ready$FullName[1]), gp=gp
                                                                                                                         c(3,3,3,3,3,3,3,3),
                                                                                                                         c(3,3,3,3,3,3,3,3)))
 
+
+
+# rpart.plot(best_model)
+# 
