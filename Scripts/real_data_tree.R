@@ -24,6 +24,7 @@ library(gbm)
 #---randomForestFunction---#########################################################################################################################################################################
 
 randomForestFunction <- function(name,dd){
+  # enable parallel processing
   dd_fun <- eval(parse(text=paste(dd)))  
   mod_formula <- as.formula(paste(name,"~","."))
   fit <- rpart(mod_formula, data = dd_fun, method="anova", #"anova", "poisson", "class" or "exp"
@@ -33,26 +34,37 @@ randomForestFunction <- function(name,dd){
 }
 
 #---caretFunction---#########################################################################################################################################################################
+# debugging
+# name="confirmed_cum_per_million"
+# dd="training_ready_sub2"
 
-caretFunction <- function(name,dd){
+caretFunction <- function(name,dd, num_cores = 8){
+  # enable parallel processing
+  print('Number of cores available = ')
+  print(getDoParWorkers())
+  registerDoParallel(num_cores)
   dd_fun <- eval(parse(text=paste(dd))) 
   mod_formula <- as.formula(paste(name,"~","."))
   
-  # implemnting CARET
+  # set seed for reproducibility
+  set.seed(825)
+  # implemnting CARET with 10-fold cross-valication
   fitControl <- trainControl(## 10-fold CV
     method = "repeatedcv",
     number = 10,
     ## repeated ten times
     repeats = 10,
     allowParallel = TRUE)
+  tuneLength.num <- 5
+  # Train a stochastic gradient boosting model ('gbm')
+  #   grid search
+  print("Training gbm...")
   gbmGrid <-  expand.grid(interaction.depth = c(1, 5, 9), 
                           n.trees = (1:30)*25, 
                           shrinkage = c(0.1, 0.01),
                           n.minobsinnode = c(20))
+  # nrow(gbmGrid)
   
-  nrow(gbmGrid)
-  
-  set.seed(825)
   gbm.mod <- train(mod_formula,
                    data = training_ready_sub2, 
                    method = "gbm", 
@@ -64,20 +76,22 @@ caretFunction <- function(name,dd){
                    na.action = na.pass)
   gbm.mod
   
-  earth.pois.mod <- train(confirmed_cum_per_million ~ .,
-                          data = training_ready_sub2,
-                          method = "earth",
-                          glm=list(family=poisson),
-                          trControl = fitControl,
-                          na.action = na.exclude)
-  earth.pois.mod
-  gam.mod <- train(confirmed_cum_per_million ~ .,
-                   data = training_ready_sub2,
-                   method = "gam",
-                   trControl = fitControl,
-                   tuneLength=tuneLength.num,
-                   na.action = na.exclude)
-  gam.mod
+  # Train a multivariatee adaptive regression spline with a poison
+  # earth.pois.mod <- train(confirmed_cum_per_million ~ .,
+  #                         data = training_ready_sub2,
+  #                         method = "earth",
+  #                         glm=list(family=poisson),
+  #                         trControl = fitControl,
+  #                         na.action = na.exclude)
+  # earth.pois.mod
+  # gam.mod <- train(confirmed_cum_per_million ~ .,
+  #                  data = training_ready_sub2,
+  #                  method = "gam",
+  #                  trControl = fitControl,
+  #                  tuneLength=tuneLength.num,
+  #                  na.action = na.exclude)
+  # gam.mod
+  print("Training party.mod ...")
   party.mod <- train(confirmed_cum_per_million ~ .,
                      data = training_ready_sub2,
                      method = "ctree",
@@ -86,6 +100,7 @@ caretFunction <- function(name,dd){
                      na.action = na.exclude)
   party.mod
   
+  print("Training rf.mod ...")
   rf.mod <- train(confirmed_cum_per_million ~ .,
                   data = training_ready_sub2,
                   method = "rf",
@@ -93,23 +108,36 @@ caretFunction <- function(name,dd){
                   tuneLength=tuneLength.num,
                   na.action = na.exclude)
   resamps <- resamples(list(gbm=gbm.mod,
-                            gam=gam.mod,
                             rf=rf.mod,
                             party=party.mod))
-  #earth.pois=earth.pois.mod))
+  
+  print('training models finished. selecing best model baesd upon RMSE of training data with cross validation')
   resamps
   ss <- summary(resamps)
   library(lattice)
   
   trellis.par.set(caretTheme())
-  dotplot(resamps, metric = "MAE")
-  dotplot(resamps, metric = "Rsquared")
-  best_model_tmp = rf.mod$finalModel
+  # dotplot(resamps, metric = "MAE")
+  dotplot(resamps, metric = "RMSE")
+  
+  # compare models based upon:
+  comp_metric = 'RMSE'
+  
+  # select best model by training Rsquared
+  model_performance_df = resamps[['values']] %>%
+    select(-Resample) %>%
+    select(contains(comp_metric))
+  mean_model_perf = colMeans(model_performance_df)
+  model_name_long = names(mean_model_perf[which.min(mean_model_perf)])
+  model_name = paste0(strsplit(model_name_long, "~")[[1]][1], ".mod")
+  best_model_tmp = get(model_name)$finalModel
   
   return(best_model_tmp)
 }
 
 #---initialFlags---#########################################################################################################################################################################
+# TRUE if you want to evaluate multiple models
+caret_flag <- F
 # TRUE if you want to scale by population
 incidence_flag <- T
 # TRUE if you want to do deaths instead of cases
@@ -294,17 +322,27 @@ if(death_flag==F){
   if(incidence_flag==T){
     training_ready_sub2 <- subset(training_ready_sub2, select=-c(confirmed_cum))
     testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(confirmed_cum))
-    best_model <- randomForestFunction(name="confirmed_cum_per_million",dd="training_ready_sub2")
-    # fit <- rpart(confirmed_cum_per_million ~ ., data = training_ready_sub2, method="anova", #"anova", "poisson", "class" or "exp"
-    #              control=rpart.control(minsplit=2, cp=0.0001))
-    # fitrf <- randomForest(confirmed_cum_per_million ~ ., data = training_ready_sub2, importance = TRUE, na.action = na.omit)
+    if(caret_flag == T){
+      best_model <- caretFunction(name="confirmed_cum_per_million",dd="training_ready_sub2")
+    }
+    else{
+      best_model <- randomForestFunction(name="confirmed_cum_per_million",dd="training_ready_sub2")
+      # fit <- rpart(confirmed_cum_per_million ~ ., data = training_ready_sub2, method="anova", #"anova", "poisson", "class" or "exp"
+      #              control=rpart.control(minsplit=2, cp=0.0001))
+      # fitrf <- randomForest(confirmed_cum_per_million ~ ., data = training_ready_sub2, importance = TRUE, na.action = na.omit)
+    }
   }else{
     # training_ready_sub2 <- subset(training_ready_sub2, select=-c(confirmed_cum_per_million))
     # testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(confirmed_cum_per_million))
-    best_model <- randomForestFunction(name="confirmed_cum",dd="training_ready_sub2")
-    # fit <- rpart(confirmed_cum ~ ., data = training_ready_sub2, method="anova", #"anova", "poisson", "class" or "exp"
-    #              control=rpart.control(minsplit=2, cp=0.0001))
-    # fitrf <- randomForest(confirmed_cum ~ ., data = training_ready_sub2, importance = TRUE, na.action = na.omit)
+    if(caret_flag == T){
+      best_model <- caretFunction(name="confirmed_cum",dd="training_ready_sub2")
+    }
+    else{
+      best_model <- randomForestFunction(name="confirmed_cum",dd="training_ready_sub2")
+      # fit <- rpart(confirmed_cum ~ ., data = training_ready_sub2, method="anova", #"anova", "poisson", "class" or "exp"
+      # control=rpart.control(minsplit=2, cp=0.0001))
+      # fitrf <- randomForest(confirmed_cum ~ ., data = training_ready_sub2, importance = TRUE, na.action = na.omit)
+    }
   }
 }else if(death_flag==T){
   training_ready_sub2 <- subset(training_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered))
@@ -332,17 +370,27 @@ if(death_flag==F){
   if(incidence_flag==T){
     training_ready_sub2 <- subset(training_ready_sub2, select=-c(death_cum))
     testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(death_cum))
-    best_model <- randomForestFunction(name="death_cum_per_million",dd="training_ready_sub2")
-    # fit <- rpart(death_cum_per_million ~ ., data = training_ready_sub2, method="anova", #"anova", "poisson", "class" or "exp"
-    #              control=rpart.control(minsplit=2, cp=0.0001))
-    # fitrf <- randomForest(death_cum_per_million ~ ., data = training_ready_sub2, importance = TRUE, na.action = na.omit)
+    if(caret_flag == T){
+      best_model <- caretFunction(name="death_cum_per_million",dd="training_ready_sub2")
+    }
+    else{
+      # best_model <- randomForestFunction(name="death_cum_per_million",dd="training_ready_sub2")
+      # fit <- rpart(death_cum_per_million ~ ., data = training_ready_sub2, method="anova", #"anova", "poisson", "class" or "exp"
+      #              control=rpart.control(minsplit=2, cp=0.0001))
+      # fitrf <- randomForest(death_cum_per_million ~ ., data = training_ready_sub2, importance = TRUE, na.action = na.omit)
+    }
   }else{
     # training_ready_sub2 <- subset(training_ready_sub2, select=-c(death_cum_per_million))
     # testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(death_cum_per_million))
-    best_model <- randomForestFunction(name="death_cum",dd="training_ready_sub2")
-    # fit <- rpart(death_cum ~ ., data = training_ready_sub2, method="anova", #"anova", "poisson", "class" or "exp"
-    #              control=rpart.control(minsplit=2, cp=0.0001))
-    # fitrf <- randomForest(death_cum ~ ., data = training_ready_sub2, importance = TRUE, na.action = na.omit)
+    if(caret_flag == T){
+      best_model <- caretFunction(name="death_cum",dd="training_ready_sub2")
+    }
+    else{
+      best_model <- randomForestFunction(name="death_cum",dd="training_ready_sub2")
+      # fit <- rpart(death_cum ~ ., data = training_ready_sub2, method="anova", #"anova", "poisson", "class" or "exp"
+      #              control=rpart.control(minsplit=2, cp=0.0001))
+      # fitrf <- randomForest(death_cum ~ ., data = training_ready_sub2, importance = TRUE, na.action = na.omit)
+    }
   }
 }
 
@@ -486,7 +534,7 @@ plot_predict <- plot_predict +
 
 #---variableImportancePlot---#########################################################################################################################################################################
 # Plot variable importance
-df <- data.frame(imp = fit$variable.importance)
+df <- data.frame(imp = best_model[["importanceSD"]])
 df2 <- df %>% 
   tibble::rownames_to_column() %>% 
   dplyr::rename("variable" = rowname) %>% 
