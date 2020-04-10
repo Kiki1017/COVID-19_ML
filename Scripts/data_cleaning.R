@@ -75,7 +75,7 @@ library(googlesheets4)
 ugly_url = 'https://docs.google.com/spreadsheets/d/1vrKvs52OAxuB7x2kT9r1q6IcIBxGEQsNRHsK_o7h3jo/edit#gid=284493712'
 meta_data <- sheets_get(ugly_url)
 npi_countries <- as.vector(unlist(meta_data$sheets[,1]))
-npi_countries <- npi_countries[c(-1,-2)]
+npi_countries <- npi_countries[c(-1,-2,-3)]
 
 # function to create lag factors for a country's time series
 create_lag <- function(country_ts, num=10, incidence=T){

@@ -20,10 +20,13 @@ library(doParallel)
 library(magrittr)
 library(dplyr)
 library(gbm)
+library(party)
+library(lattice)
+library(earth)
 
 #---randomForestFunction---#########################################################################################################################################################################
 
-randomForestFunction <- function(name,dd){
+randomForestFunction <- function(name="confirmed_cum_per_million",dd="training_ready_sub2"){
   # enable parallel processing
   dd_fun <- eval(parse(text=paste(dd)))  
   mod_formula <- as.formula(paste(name,"~","."))
@@ -40,7 +43,7 @@ randomForestFunction <- function(name,dd){
 name="confirmed_cum_per_million"
 dd="training_ready_sub2"
 
-caretFunction <- function(name,dd, num_cores = 8){
+caretFunction <- function(name="confirmed_cum_per_million",dd="training_ready_sub2", num_cores = 4, n_trees = (1:30)*25, gbm_flag=T, earth_pois_flag=F, gam_flag=F, party_flag=F, rf_flag=T, all_flag=F){
   # enable parallel processing
   print('Number of cores available = ')
   print(getDoParWorkers())
@@ -54,69 +57,96 @@ caretFunction <- function(name,dd, num_cores = 8){
   fitControl <- trainControl(## 10-fold CV
     method = "repeatedcv",
     number = 10,
+    # number = 2,
     ## repeated ten times
+    # repeats = 10,
     repeats = 10,
     allowParallel = TRUE)
   tuneLength.num <- 5
   # Train a stochastic gradient boosting model ('gbm')
   #   grid search
-  print("Training gbm...")
-  gbmGrid <-  expand.grid(interaction.depth = c(1, 5, 9), 
-                          n.trees = (1:30)*25, 
-                          shrinkage = c(0.1, 0.01),
-                          n.minobsinnode = c(20))
-  # nrow(gbmGrid)
+  if(gbm_flag==T | all_flag==T){
+    gbm_flag=T
+    print("Training gbm...")
+    gbmGrid <-  expand.grid(interaction.depth = c(1, 5, 9), 
+                            n.trees = n_trees, 
+                            shrinkage = c(0.1, 0.01),
+                            n.minobsinnode = c(20))
+    # nrow(gbmGrid)
+    gbm.mod <- train(mod_formula,
+                     data = training_ready_sub2, 
+                     method = "gbm", 
+                     trControl = fitControl, 
+                     verbose = FALSE, 
+                     ## Now specify the exact models 
+                     ## to evaluate:
+                     tuneGrid = gbmGrid,
+                     na.action = na.pass)
+    gbm.mod
+  }else{gbm.mod <- NA}
+
+  if(earth_pois_flag==T | all_flag==T){
+    earth_pois_flag=T
+    print("Training earth.pois.mod...")
+    # Train a multivariatee adaptive regression spline with a poison
+    earth.pois.mod <- train(confirmed_cum_per_million ~ .,
+                            data = training_ready_sub2,
+                            method = "earth",
+                            glm=list(family=poisson),
+                            trControl = fitControl,
+                            na.action = na.exclude)
+    earth.pois.mod
+  }else{earth.pois.mod <- NA}
   
-  gbm.mod <- train(mod_formula,
-                   data = training_ready_sub2, 
-                   method = "gbm", 
-                   trControl = fitControl, 
-                   verbose = FALSE, 
-                   ## Now specify the exact models 
-                   ## to evaluate:
-                   tuneGrid = gbmGrid,
-                   na.action = na.pass)
-  gbm.mod
-  
-  # Train a multivariatee adaptive regression spline with a poison
-  # earth.pois.mod <- train(confirmed_cum_per_million ~ .,
-  #                         data = training_ready_sub2,
-  #                         method = "earth",
-  #                         glm=list(family=poisson),
-  #                         trControl = fitControl,
-  #                         na.action = na.exclude)
-  # earth.pois.mod
-  # gam.mod <- train(confirmed_cum_per_million ~ .,
-  #                  data = training_ready_sub2,
-  #                  method = "gam",
-  #                  trControl = fitControl,
-  #                  tuneLength=tuneLength.num,
-  #                  na.action = na.exclude)
-  # gam.mod
-  print("Training party.mod ...")
-  party.mod <- train(confirmed_cum_per_million ~ .,
+  if(gam_flag==T | all_flag==T){
+    gam_flag=T
+    print("Training gam.mod...")
+    gam.mod <- train(confirmed_cum_per_million ~ .,
                      data = training_ready_sub2,
-                     method = "ctree",
+                     method = "gam",
                      trControl = fitControl,
                      tuneLength=tuneLength.num,
                      na.action = na.exclude)
-  party.mod
+    gam.mod
+  }else{gam.mod <- NA}
   
-  print("Training rf.mod ...")
-  rf.mod <- train(confirmed_cum_per_million ~ .,
-                  data = training_ready_sub2,
-                  method = "rf",
-                  trControl = fitControl,
-                  tuneLength=tuneLength.num,
-                  na.action = na.exclude)
+  if(party_flag==T | all_flag==T){
+    party_flag=T
+    print("Training party.mod ...")
+    party.mod <- train(confirmed_cum_per_million ~ .,
+                       data = training_ready_sub2,
+                       method = "ctree",
+                       trControl = fitControl,
+                       tuneLength=tuneLength.num,
+                       na.action = na.exclude)
+    party.mod
+  }else{party.mod <- NA}
+  
+  if(rf_flag==T | all_flag==T){
+    rf_flag=T
+    print("Training rf.mod ...")
+    rf.mod <- train(confirmed_cum_per_million ~ .,
+                    data = training_ready_sub2,
+                    method = "rf",
+                    trControl = fitControl,
+                    tuneLength=tuneLength.num,
+                    na.action = na.exclude)
+    rf.mod
+  }else{rf.mod <- NA}
+  
+  flag_list <- c(gbm_flag, earth_pois_flag, gam_flag, party_flag, rf_flag)
+  
   resamps <- resamples(list(gbm=gbm.mod,
-                            rf=rf.mod,
-                            party=party.mod))
+                            earth_pois=earth.pois.mod,
+                            gam=gam.mod,
+                            party=party.mod,
+                            rf=rf.mod
+                            )[flag_list]
+                       )
   
   print('training models finished. selecing best model baesd upon RMSE of training data with cross validation')
   resamps
   ss <- summary(resamps)
-  library(lattice)
   
   trellis.par.set(caretTheme())
   # dotplot(resamps, metric = "MAE")
@@ -136,12 +166,56 @@ caretFunction <- function(name,dd, num_cores = 8){
   model_name = paste0(strsplit(model_name_long, "~")[[1]][1], ".mod")
   best_model_tmp = get(model_name)$finalModel
   
+  # best_model_tmp = gbm.mod
+  # best_model_tmp = earth.pois.mod
+  # best_model_tmp = gam.mod
+  # best_model_tmp = party.mod
+  # best_model_tmp = rf.mod
+  
   return(best_model_tmp)
 }
 
+#---predictFunction---#########################################################################################################################################################################
+
+predictFunction <- function(name=best_model, dd=testing_ready_pred, n_trees = (1:30)*25, nasaction = na.pass){
+  # enable parallel processing
+  # predict_df <- eval(parse(text=paste(dd)))
+  if("gbm" %in% class(name) | "gbm" %in% name$modelInfo[["library"]]){
+    dd %<>% mutate_if(is.factor,as.character)  
+    dd %<>% mutate_if(is.character,as.numeric)
+    predict_tmp <- predict(name, dd, na.action = nasaction, n.trees = n_trees)
+  }else if("earth" %in% class(name) | "earth" %in% name$modelInfo[["library"]]){
+    dd %<>% mutate_if(is.factor,as.character)  
+    dd %<>% mutate_if(is.character,as.numeric)
+    predict_tmp <- predict(name, dd, na.action = nasaction, n.trees = n_trees)
+  }else if("gam" %in% class(name) | "mgcv" %in% name$modelInfo[["library"]]){
+    dd %<>% mutate_if(is.factor,as.character)  
+    dd %<>% mutate_if(is.character,as.numeric)
+    predict_tmp <- predict(name, dd, na.action = nasaction, n.trees = n_trees)
+  }else if("party" %in% class(name) | "party" %in% name$modelInfo[["library"]]){
+    dd %<>% mutate_if(is.factor,as.character)  
+    dd %<>% mutate_if(is.character,as.numeric)
+    predict_tmp <- predict(name, dd, na.action = nasaction, n.trees = n_trees)
+  }else if("randomForest" %in% class(name) | "randomForest" %in% name$modelInfo[["library"]]){
+    dd %<>% mutate_if(is.factor,as.character)  
+    dd %<>% mutate_if(is.character,as.numeric)
+    predict_tmp <- predict(name, dd, na.action = nasaction)
+  }
+  return(predict_tmp)
+}
+
+# p1 <- predictFunction(name=best_model,dd=testing_ready_pred[1:(breaker-1),], n_trees = number_trees, nasaction = na.pass)
+
 #---initialFlags---#########################################################################################################################################################################
 # TRUE if you want to evaluate multiple models
-caret_flag <- F
+caret_flag <- T
+number_trees <- (1:30)*25
+gbm_flag=T
+earth_pois_flag=F
+gam_flag=T
+party_flag=T
+rf_flag=T
+all_flag=F
 
 # TRUE if you want to scale by population
 incidence_flag <- T
@@ -152,7 +226,7 @@ incidence_start_point <- 0.3
 if(death_flag==T){incidence_start_point <- incidence_start_point*(5.9/100)}
 count_start_point <- 100
 nLags <- 10
-projectionTime <- 5
+projectionTime <- 14
 NPIflag1 <- "autofill"
 NPIflag2 <- "lastNPI"
 
@@ -165,14 +239,16 @@ glimpse(data_clean)
 summary(data_clean)
 
 # testing_countries <- c("USA")
-testing_countries <- c("ITA")
+# testing_countries <- c("ITA")
 # testing_countries <- c("BRA")
 # testing_countries <- c("ESP")
-# testing_countries <- c("HUB")
+testing_countries <- c("GBR")
 
 # make country lists, these are the ones that we have NPI data collected for
-
-training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","HUB","KOR","USA","SWE","AUT","CHE","DEU","FRA")
+# https://docs.google.com/spreadsheets/d/1vrKvs52OAxuB7x2kT9r1q6IcIBxGEQsNRHsK_o7h3jo/edit#gid=378237553
+# training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","HUB","KOR","USA","SWE","AUT","CHE","DEU","FRA")
+# training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","HUB","KOR","USA","SWE","AUT","CHE","DEU","FRA","DZA","IRN","CAN","TUR","BEL","NLD","PRT","ISR","RUS","NOR","IRL","AUS","IND","DNK","CHL","CZE","JPN","UKR","MAR","ARG","SGP","ROU")
+training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","HUB","KOR","USA","SWE","AUT","CHE","DEU","FRA","DZA","IRN","CAN","TUR","BEL","ANT","PRT","ISR","RUS","NOR","IRL","AUS","IND","DNK","CHL","CZE","JPN","UKR","MAR","ARG","SGP","ROU")
 # training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","USA","SWE","AUT","CHE","DEU","FRA")
 training_countries <- training_countries_all[which(training_countries_all != testing_countries)]
 
@@ -204,7 +280,7 @@ for(i in 1:length(testing_countries)){
   }
   testing_subset_aligned <- testing_subset[start:nrow(testing_subset),]
   tmp <- testing_subset_aligned[1:projectionTime,]
-  tmp[,grep("cum", colnames(tmp))] <- NA
+  tmp[,grep("cum|Social_Distancing|Quaranting_Cases|Close_Border|date|confirmed", colnames(tmp))] <- NA
   tmp$Social_Distancing <- NA
   tmp$Quaranting_Cases <- NA
   tmp$Close_Border <- NA
@@ -292,7 +368,7 @@ plot1 <- plot1 +
         axis.title.y = element_text(color="black",size = 13, angle = 90)
   )+
   # scale_x_continuous(breaks=seq(1, 10, 1))+
-  theme(legend.text=element_text(size=16))+
+  theme(legend.text=element_text(size=9))+
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
         panel.background = element_blank(), axis.line = element_line(colour = "black"))
 
@@ -303,9 +379,7 @@ str(testing_ready)
 # Create a Random Forest model with default parameters
 if(death_flag==F){
   training_ready_sub2 <- subset(training_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered))
-  training_ready_sub2 <- training_ready_sub2[,grep("death", colnames(training_ready_sub2),invert = T)]
-  training_ready_sub2 <- training_ready_sub2[,grep("MalePercent", colnames(training_ready_sub2),invert = T)]  
-  training_ready_sub2 <- training_ready_sub2[,grep("FemalePercent", colnames(training_ready_sub2),invert = T)]
+  training_ready_sub2 <- training_ready_sub2[,grep("death|MalePercent|FemalePercent", colnames(training_ready_sub2),invert = T)]
   for(i in (nLags+1):100){
     training_ready_sub2 <- training_ready_sub2[,grep(paste0(sprintf("lag_%02d", i)), colnames(training_ready_sub2),invert = T)]
   }
@@ -314,9 +388,7 @@ if(death_flag==F){
   training_ready_sub2 %<>% mutate_if(is.character,as.numeric)
   # remove more columns we don't want in the model
   testing_ready_sub2 <- subset(testing_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered))
-  testing_ready_sub2 <- testing_ready_sub2[,grep("death", colnames(testing_ready_sub2),invert = T)]
-  testing_ready_sub2 <- testing_ready_sub2[,grep("MalePercent", colnames(testing_ready_sub2),invert = T)]  
-  testing_ready_sub2 <- testing_ready_sub2[,grep("FemalePercent", colnames(testing_ready_sub2),invert = T)]
+  testing_ready_sub2 <- testing_ready_sub2[,grep("death|MalePercent|FemalePercent", colnames(testing_ready_sub2),invert = T)]
   for(i in (nLags+1):100){
     testing_ready_sub2 <- testing_ready_sub2[,grep(paste0(sprintf("lag_%02d", i)), colnames(testing_ready_sub2),invert = T)]
   }
@@ -328,7 +400,7 @@ if(death_flag==F){
     training_ready_sub2 <- subset(training_ready_sub2, select=-c(confirmed_cum))
     testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(confirmed_cum))
     if(caret_flag == T){
-      best_model <- caretFunction(name="confirmed_cum_per_million",dd="training_ready_sub2")
+      best_model <- caretFunction(name="confirmed_cum_per_million",dd="training_ready_sub2",n_trees = number_trees,gbm_flag=gbm_flag, earth_pois_flag=earth_pois_flag, gam_flag=gam_flag, party_flag=party_flag, rf_flag=rf_flag, all_flag=all_flag)
     }
     else{
       best_model <- randomForestFunction(name="confirmed_cum_per_million",dd="training_ready_sub2")
@@ -340,7 +412,7 @@ if(death_flag==F){
     # training_ready_sub2 <- subset(training_ready_sub2, select=-c(confirmed_cum_per_million))
     # testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(confirmed_cum_per_million))
     if(caret_flag == T){
-      best_model <- caretFunction(name="confirmed_cum",dd="training_ready_sub2")
+      best_model <- caretFunction(name="confirmed_cum",dd="training_ready_sub2",n_trees = number_trees, earth_pois_flag=earth_pois_flag, gam_flag=gam_flag, party_flag=party_flag, rf_flag=rf_flag, all_flag=all_flag)
     }
     else{
       best_model <- randomForestFunction(name="confirmed_cum",dd="training_ready_sub2")
@@ -351,9 +423,7 @@ if(death_flag==F){
   }
 }else if(death_flag==T){
   training_ready_sub2 <- subset(training_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered))
-  training_ready_sub2 <- training_ready_sub2[,grep("confirmed", colnames(training_ready_sub2),invert = T)]
-  training_ready_sub2 <- training_ready_sub2[,grep("MalePercent", colnames(training_ready_sub2),invert = T)]  
-  training_ready_sub2 <- training_ready_sub2[,grep("FemalePercent", colnames(training_ready_sub2),invert = T)]
+  training_ready_sub2 <- training_ready_sub2[,grep("confirmed|MalePercent|FemalePercent", colnames(training_ready_sub2),invert = T)]
   for(i in (nLags+1):100){
     training_ready_sub2 <- training_ready_sub2[,grep(paste0(sprintf("lag_%02d", i)), colnames(training_ready_sub2),invert = T)]
   }
@@ -362,9 +432,7 @@ if(death_flag==F){
   training_ready_sub2 %<>% mutate_if(is.character,as.numeric)
   # remove more columns we don't want in the model
   testing_ready_sub2 <- subset(testing_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered))
-  testing_ready_sub2 <- testing_ready_sub2[,grep("confirmed", colnames(testing_ready_sub2),invert = T)]
-  testing_ready_sub2 <- testing_ready_sub2[,grep("MalePercent", colnames(testing_ready_sub2),invert = T)]  
-  testing_ready_sub2 <- testing_ready_sub2[,grep("FemalePercent", colnames(testing_ready_sub2),invert = T)]
+  testing_ready_sub2 <- testing_ready_sub2[,grep("confirmed|MalePercent|FemalePercent", colnames(testing_ready_sub2),invert = T)]
   for(i in (nLags+1):100){
     testing_ready_sub2 <- testing_ready_sub2[,grep(paste0(sprintf("lag_%02d", i)), colnames(testing_ready_sub2),invert = T)]
   }
@@ -376,7 +444,7 @@ if(death_flag==F){
     training_ready_sub2 <- subset(training_ready_sub2, select=-c(death_cum))
     testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(death_cum))
     if(caret_flag == T){
-      best_model <- caretFunction(name="death_cum_per_million",dd="training_ready_sub2")
+      best_model <- caretFunction(name="death_cum_per_million",dd="training_ready_sub2",n_trees = number_trees, earth_pois_flag=earth_pois_flag, gam_flag=gam_flag, party_flag=party_flag, rf_flag=rf_flag, all_flag=all_flag)
     }
     else{
       # best_model <- randomForestFunction(name="death_cum_per_million",dd="training_ready_sub2")
@@ -388,7 +456,7 @@ if(death_flag==F){
     # training_ready_sub2 <- subset(training_ready_sub2, select=-c(death_cum_per_million))
     # testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(death_cum_per_million))
     if(caret_flag == T){
-      best_model <- caretFunction(name="death_cum",dd="training_ready_sub2")
+      best_model <- caretFunction(name="death_cum",dd="training_ready_sub2",n_trees = number_trees, earth_pois_flag=earth_pois_flag, gam_flag=gam_flag, party_flag=party_flag, rf_flag=rf_flag, all_flag=all_flag)
     }
     else{
       best_model <- randomForestFunction(name="death_cum",dd="training_ready_sub2")
@@ -420,7 +488,8 @@ if(NPIflag2 == "lastNPI"){
 # testing_ready_pred$Social_Distancing
 
 #---makePrediction---#########################################################################################################################################################################
-p1 <- predict(best_model, testing_ready_pred[1:(breaker-1),], na.action = na.pass)
+# p1 <- predict(best_model, testing_ready_pred[1:(breaker-1),], na.action = na.pass, n.trees = number_trees)
+p1 <- predictFunction(name=best_model,dd=testing_ready_pred[1:(breaker-1),], n_trees = number_trees)
 for(i in breaker:nrow(testing_ready_pred)){
   for(l in 1:nLags){
     if(l==1){
@@ -449,20 +518,30 @@ for(i in breaker:nrow(testing_ready_pred)){
     }
   }
   if(incidence_flag==T && death_flag==F){
-    testing_ready_pred[i,c(paste0("confirmed_cum_per_million"))] <- predict(best_model, testing_ready_pred[i,], na.action = na.pass)
+    # testing_ready_pred[i,c(paste0("confirmed_cum_per_million"))] <- predict(best_model, testing_ready_pred[i,], na.action = na.pass, n.trees = number_trees)
+    testing_ready_pred[i,c(paste0("confirmed_cum_per_million"))] <- "NA_PlaceHolder"
+    testing_ready_pred[i,c(paste0("confirmed_cum_per_million"))] <- predictFunction(name=best_model,dd=testing_ready_pred[i,], n_trees = number_trees)
   }else if(incidence_flag==T && death_flag==T){
-    testing_ready_pred[i,c(paste0("death_cum_per_million"))] <- predict(best_model, testing_ready_pred[i,], na.action = na.pass)
+    # testing_ready_pred[i,c(paste0("death_cum_per_million"))] <- predict(best_model, testing_ready_pred[i,], na.action = na.pass, n.trees = number_trees)
+    testing_ready_pred[i,c(paste0("death_cum_per_million"))] <- "NA_PlaceHolder"
+    testing_ready_pred[i,c(paste0("death_cum_per_million"))] <- predictFunction(name=best_model,dd=testing_ready_pred[i,], n_trees = number_trees)
   }else if(incidence_flag==F && death_flag==F){
-    testing_ready_pred[i,c(paste0("confirmed_cum"))] <- predict(best_model, testing_ready_pred[i,], na.action = na.pass)
+    # testing_ready_pred[i,c(paste0("confirmed_cum"))] <- predict(best_model, testing_ready_pred[i,], na.action = na.pass, n.trees = number_trees)
+    testing_ready_pred[i,c(paste0("confirmed_cum"))] <- "NA_PlaceHolder"
+    testing_ready_pred[i,c(paste0("confirmed_cum"))] <- predictFunction(name=best_model,dd=testing_ready_pred[i,], n_trees = number_trees)
   }else if(incidence_flag==F && death_flag==T){
-    testing_ready_pred[i,c(paste0("death_cum"))] <- predict(best_model, testing_ready_pred[i,], na.action = na.pass)
+    # testing_ready_pred[i,c(paste0("death_cum"))] <- predict(best_model, testing_ready_pred[i,], na.action = na.pass, n.trees = number_trees)
+    testing_ready_pred[i,c(paste0("death_cum"))] <- "NA_PlaceHolder"
+    testing_ready_pred[i,c(paste0("death_cum"))] <- predictFunction(name=best_model,dd=testing_ready_pred[i,], n_trees = number_trees)
   }
   # testing_ready_pred[(breaker-5):(i),grep("confirmed_cum_per_million", colnames(testing_ready_pred))]
   if(i==breaker){
-    pN <- predict(best_model, testing_ready_pred[i,], na.action = na.pass)
+    # pN <- predict(best_model, testing_ready_pred[i,], na.action = na.pass, n.trees = number_trees)
+    pN <- predictFunction(name=best_model,dd=testing_ready_pred[i,], n_trees = number_trees)
     pAll <- c(p1,pN)
   }else{
-    pN <- predict(best_model, testing_ready_pred[i,], na.action = na.pass)
+    # pN <- predict(best_model, testing_ready_pred[i,], na.action = na.pass, n.trees = number_trees)
+    pN <-  predictFunction(name=best_model,dd=testing_ready_pred[i,], n_trees = number_trees)
     pAll <- c(pAll,pN)
   }
 }
@@ -506,7 +585,7 @@ plot_predict <- plot_predict +
   geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size = 3, colour = 'red', alpha = 0.1) +
   geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size = 2, colour = 'red', alpha = 0.2) +
   geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size = 1, colour = 'red', alpha = 0.5) +
-  geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size=0.95, colour = 'limegreen', linetype = "3313",alpha=.7)
+  geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), lwd=1.5, colour = 'deepskyblue3', linetype = "dashed",alpha=.7)
 # geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size = 3, colour = 'red', alpha = 0.1, linetype = "3313") +
 # geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size = 2, colour = 'red', alpha = 0.2, linetype = "3313") +
 # geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size = 1, colour = 'red', alpha = 0.5, linetype = "3313") +
@@ -541,9 +620,52 @@ plot_predict <- plot_predict +
 # Plot variable importance
 
 if(caret_flag==T){
-  df <- data.frame(imp = best_model[["importance"]])
+  if("gbm" %in% class(best_model)){
+    print("Model chosen by caret is: gbm")
+    df <- data.frame(imp = best_model[["importance"]])
+    colnames(df) = c('imp')
+  }else if("gbm" %in% best_model$modelInfo[["library"]]){
+  print("Model chosen by caret is: gbm")
+  df_tmp <- varImp(best_model)
+  df <- as.data.frame(df_tmp$importance)
   colnames(df) = c('imp')
-  print(paste0("Model chosen by caret is: ", class(best_model)))
+  }else if("earth" %in% class(best_model)){
+    print("Model chosen by caret is: earth")
+    df <- data.frame(imp = best_model[["importance"]])
+    colnames(df) = c('imp')
+  }else if("earth" %in% best_model$modelInfo[["library"]]){
+    print("Model chosen by caret is: earth")
+    df_tmp <- varImp(best_model)
+    df <- as.data.frame(df_tmp$importance)
+    colnames(df) = c('imp')
+  }else if("gam" %in% class(best_model)){
+    print("Model chosen by caret is: gam")
+    df <- data.frame(imp = best_model[["importance"]])
+    colnames(df) = c('imp')
+  }else if("mgcv" %in% best_model$modelInfo[["library"]]){
+    print("Model chosen by caret is: gam")
+    df_tmp <- varImp(best_model)
+    df <- as.data.frame(df_tmp$importance)
+    colnames(df) = c('imp')
+  }else if("party" %in% class(best_model)){
+    print("Model chosen by caret is: party")
+    df <- data.frame(imp = best_model[["importance"]])
+    colnames(df) = c('imp')
+  }else if("party" %in% best_model$modelInfo[["library"]]){
+    print("Model chosen by caret is: party")
+    df_tmp <- varImp(best_model)
+    df <- as.data.frame(df_tmp$importance)
+    colnames(df) = c('imp')
+  }else if("randomForest" %in% class(best_model)){
+    print("Model chosen by caret is: randomForest")
+    df <- data.frame(imp = best_model[["importance"]])
+    colnames(df) = c('imp')
+  }else if("randomForest" %in% best_model$modelInfo[["library"]]){
+    print("Model chosen by caret is: randomForest")
+    df_tmp <- varImp(best_model)
+    df <- as.data.frame(df_tmp$importance)
+    colnames(df) = c('imp')
+  }
 }else{
   df <- data.frame(imp = best_model[["importanceSD"]])
 }
@@ -563,9 +685,11 @@ plot_varimp <- ggplot2::ggplot(df2) +
 
 #---cumulativePlot---#########################################################################################################################################################################
 gl <- list(plot1,plot_predict,plot_varimp)
-grid.arrange(grobs = gl, top = textGrob(paste0(testing_ready$FullName[1]), gp=gpar(fontsize=15)), layout_matrix = rbind(c(1,1,1,1,2,2,2,2),
-                                                                                                                        c(1,1,1,1,2,2,2,2),
-                                                                                                                        c(1,1,1,1,2,2,2,2),
+grid.arrange(grobs = gl, top = textGrob(paste0(testing_ready$FullName[1]), gp=gpar(fontsize=20)), layout_matrix = rbind(c(1,1,1,1,1,2,2,2),
+                                                                                                                        c(1,1,1,1,1,2,2,2),
+                                                                                                                        c(1,1,1,1,1,2,2,2),
+                                                                                                                        c(3,3,3,3,3,3,3,3),
+                                                                                                                        c(3,3,3,3,3,3,3,3),
                                                                                                                         c(3,3,3,3,3,3,3,3),
                                                                                                                         c(3,3,3,3,3,3,3,3),
                                                                                                                         c(3,3,3,3,3,3,3,3)))
@@ -574,3 +698,4 @@ grid.arrange(grobs = gl, top = textGrob(paste0(testing_ready$FullName[1]), gp=gp
 
 # rpart.plot(best_model)
 # 
+

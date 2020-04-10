@@ -282,7 +282,7 @@ house$FullName[house$FullName=="Venezuela (Bolivarian Republic of)"] <- "Venezue
 house$FullName[house$FullName=="Viet Nam"] <- "Vietnam"
 
 for(i in 1:length(merge_all$FullName)){
-  curName <- house$FullName[i]
+  curName <- merge_all$FullName[i]
   if(curName %in% house$FullName){
     cursub <- subset(house, house$FullName==curName)
     merge_all$Ave_household_size[i] <- as.numeric(cursub$Average_household_size[which(cursub$Date == max(cursub$Date,na.rm=T))])
@@ -294,6 +294,8 @@ for(i in 1:length(merge_all$FullName)){
 }
 
 dim(merge_all)
+
+merge_all$Ave_household_size[which(merge_all$FullName=="Italy")]
 
 
 ###########################################################################################################################################
