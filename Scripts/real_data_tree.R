@@ -43,10 +43,10 @@ randomForestFunction <- function(name="confirmed_cum_per_million",dd="training_r
 name="confirmed_cum_per_million"
 dd="training_ready_sub2"
 
-caretFunction <- function(name="confirmed_cum_per_million",dd="training_ready_sub2", num_cores = 4, n_trees = (1:30)*25, gbm_flag=T, earth_pois_flag=F, gam_flag=F, party_flag=F, rf_flag=T, all_flag=F){
+caretFunction <- function(name="confirmed_cum_per_million",dd="training_ready_sub2", num_cores = detectCores(), n_trees = (1:30)*25, gbm_flag=T, earth_pois_flag=F, gam_flag=F, party_flag=F, rf_flag=T, all_flag=F){
   # enable parallel processing
-  print('Number of cores available = ')
-  print(getDoParWorkers())
+  print('Number of cores being used = ')
+  print(paste0(num_cores, ", of possible ", detectCores()))
   registerDoParallel(num_cores)
   dd_fun <- eval(parse(text=paste(dd))) 
   mod_formula <- as.formula(paste(name,"~","."))
@@ -489,7 +489,7 @@ if(NPIflag2 == "lastNPI"){
 
 #---makePrediction---#########################################################################################################################################################################
 # p1 <- predict(best_model, testing_ready_pred[1:(breaker-1),], na.action = na.pass, n.trees = number_trees)
-p1 <- predictFunction(name=best_model,dd=testing_ready_pred[1:(breaker-1),], n_trees = number_trees)
+p1 <- predictFunction(name=best_model,dd=testing_ready_pred[1:(breaker-1),], n_trees = 1)
 for(i in breaker:nrow(testing_ready_pred)){
   for(l in 1:nLags){
     if(l==1){
@@ -520,28 +520,28 @@ for(i in breaker:nrow(testing_ready_pred)){
   if(incidence_flag==T && death_flag==F){
     # testing_ready_pred[i,c(paste0("confirmed_cum_per_million"))] <- predict(best_model, testing_ready_pred[i,], na.action = na.pass, n.trees = number_trees)
     testing_ready_pred[i,c(paste0("confirmed_cum_per_million"))] <- "NA_PlaceHolder"
-    testing_ready_pred[i,c(paste0("confirmed_cum_per_million"))] <- predictFunction(name=best_model,dd=testing_ready_pred[i,], n_trees = number_trees)
+    testing_ready_pred[i,c(paste0("confirmed_cum_per_million"))] <- predictFunction(name=best_model,dd=testing_ready_pred[i,], n_trees = 1)
   }else if(incidence_flag==T && death_flag==T){
     # testing_ready_pred[i,c(paste0("death_cum_per_million"))] <- predict(best_model, testing_ready_pred[i,], na.action = na.pass, n.trees = number_trees)
     testing_ready_pred[i,c(paste0("death_cum_per_million"))] <- "NA_PlaceHolder"
-    testing_ready_pred[i,c(paste0("death_cum_per_million"))] <- predictFunction(name=best_model,dd=testing_ready_pred[i,], n_trees = number_trees)
+    testing_ready_pred[i,c(paste0("death_cum_per_million"))] <- predictFunction(name=best_model,dd=testing_ready_pred[i,], n_trees = 1)
   }else if(incidence_flag==F && death_flag==F){
     # testing_ready_pred[i,c(paste0("confirmed_cum"))] <- predict(best_model, testing_ready_pred[i,], na.action = na.pass, n.trees = number_trees)
     testing_ready_pred[i,c(paste0("confirmed_cum"))] <- "NA_PlaceHolder"
-    testing_ready_pred[i,c(paste0("confirmed_cum"))] <- predictFunction(name=best_model,dd=testing_ready_pred[i,], n_trees = number_trees)
+    testing_ready_pred[i,c(paste0("confirmed_cum"))] <- predictFunction(name=best_model,dd=testing_ready_pred[i,], n_trees = 1)
   }else if(incidence_flag==F && death_flag==T){
     # testing_ready_pred[i,c(paste0("death_cum"))] <- predict(best_model, testing_ready_pred[i,], na.action = na.pass, n.trees = number_trees)
     testing_ready_pred[i,c(paste0("death_cum"))] <- "NA_PlaceHolder"
-    testing_ready_pred[i,c(paste0("death_cum"))] <- predictFunction(name=best_model,dd=testing_ready_pred[i,], n_trees = number_trees)
+    testing_ready_pred[i,c(paste0("death_cum"))] <- predictFunction(name=best_model,dd=testing_ready_pred[i,], n_trees = 1)
   }
   # testing_ready_pred[(breaker-5):(i),grep("confirmed_cum_per_million", colnames(testing_ready_pred))]
   if(i==breaker){
     # pN <- predict(best_model, testing_ready_pred[i,], na.action = na.pass, n.trees = number_trees)
-    pN <- predictFunction(name=best_model,dd=testing_ready_pred[i,], n_trees = number_trees)
+    pN <- predictFunction(name=best_model,dd=testing_ready_pred[i,], n_trees = 1)
     pAll <- c(p1,pN)
   }else{
     # pN <- predict(best_model, testing_ready_pred[i,], na.action = na.pass, n.trees = number_trees)
-    pN <-  predictFunction(name=best_model,dd=testing_ready_pred[i,], n_trees = number_trees)
+    pN <-  predictFunction(name=best_model,dd=testing_ready_pred[i,], n_trees = 1)
     pAll <- c(pAll,pN)
   }
 }
@@ -622,7 +622,8 @@ plot_predict <- plot_predict +
 if(caret_flag==T){
   if("gbm" %in% class(best_model)){
     print("Model chosen by caret is: gbm")
-    df <- data.frame(imp = best_model[["importance"]])
+    df_tmp <- varImp(best_model)
+    df <- as.data.frame(df_tmp)
     colnames(df) = c('imp')
   }else if("gbm" %in% best_model$modelInfo[["library"]]){
   print("Model chosen by caret is: gbm")
