@@ -30,7 +30,7 @@ head(coronavirus)
 country_codes <- read.csv('./InputData/CountryCodes.csv')
 
 # Load in population data
-population <- read_excel("./InputData/pop_hub.xlsx", sheet = "pop_1000s", col_names = T)
+population <- read_excel("./InputData/pop.xlsx", sheet = "pop_1000s", col_names = T)
 
 population_countrycodes <- merge(country_codes,population, by='ISO3')
 population_countrycodes <- population_countrycodes %>%
@@ -40,6 +40,16 @@ glimpse(population_countrycodes)
 
 # Add ISO country codes to project
 raw_data = tbl_df(merge(coronavirus, population_countrycodes, by.x='Country.Region', by.y='Country'))
+if(HubeiFlag==T){
+  raw_data = mutate(raw_data, Country.Region = replace(Country.Region,Country.Region == 'China', 'Hubei')) %>%
+    # filter(Country.Region =='Hubei' | Province.State != 'Hubei')
+    filter(!Province.State %in% c('Shandong','Guizhou','Hainan',
+           'Macau','Ningxia','Inner Mongolia','Yunnan','Sichuan','Zhejiang','Guangxi','Guangdong','Hong Kong','Hunan',
+           'Shaanxi','Shanxi','Tibet','Heilongjiang','Qinghai','Hebei','Chongqing','Liaoning','Xinjiang','Gansu',
+           'Jiangsu','Jiangxi','Anhui','Henan','Shanghai','Fujian','Tianjin','Beijing','Jilin')) %>%
+    mutate(ISO3 = replace(ISO3, ISO3=='CHN','HUB'))
+    
+}
 
 ## Functions to apply to a single country  ----
 # Function to create a collapsed time series of data with cummulative sums for each country (if multiple regions exist)
@@ -118,6 +128,19 @@ create_COVID_ML_df <- function(coronavirus, num_cases_min = 4000, num_lag=10, in
     summarise(total_cases = sum(cases)) %>%
     filter(type=='confirmed') %>%
     arrange(-total_cases)
+  if(HubeiFlag == T){
+    HUB = coronavirus %>%
+      filter(Country.Region != 'Cruise Ship') %>%
+      group_by(Country.Region, type) %>%
+      filter(Province.State == 'Hubei') %>%
+      summarise(total_cases = sum(cases)) %>%
+      filter(type=='confirmed')
+    HUB[1,1] <- 'Hubei'
+    summary_df = summary_df %>%
+      filter(Country.Region != 'China') %>%
+      bind_rows(HUB) %>%
+      arrange(-total_cases)
+  }
   # filter by minimum number of cases
   countries_list = summary_df %>%
     filter(total_cases >= num_cases_min) %>%
@@ -155,12 +178,13 @@ country_ts_lag <- create_lag(country_ts, num=10, incidence = incidence_flag)
 
 output_df <- create_COVID_ML_df(coronavirus, num_cases_min = 1000, num_lag = 20, incidence_flag = incidence_flag)   # to change from cases per million to total cases, change default value in function defined above (country_timeseries)
 
-if(HubeiFlag == T){
-  output_df$Country <- as.character(output_df$Country)
-  output_df$Country[output_df$Country == "China"] <- "Hubei"
-  output_df$ISO3 <- as.character(output_df$ISO3)
-  output_df$ISO3[output_df$ISO3 == "CHN"] <- "HUB"
-}
+# if(HubeiFlag == T){
+#   output_df$Country <- as.character(output_df$Country)
+#   output_df$Country[output_df$Country == "China"] <- "Hubei"
+#   output_df$ISO3 <- as.character(output_df$ISO3)
+#   output_df$ISO3[output_df$ISO3 == "CHN"] <- "HUB"
+#   
+# }
 
 write.csv(output_df, file="InputData/data_COVID_2020_04_02.csv")
 
