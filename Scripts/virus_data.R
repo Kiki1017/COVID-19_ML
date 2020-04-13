@@ -128,6 +128,7 @@ create_COVID_ML_df <- function(coronavirus, num_cases_min = 4000, num_lag=10, in
     summarise(total_cases = sum(cases)) %>%
     filter(type=='confirmed') %>%
     arrange(-total_cases)
+<<<<<<< HEAD
   if(HubeiFlag == T){
     HUB = coronavirus %>%
       filter(Country.Region != 'Cruise Ship') %>%
@@ -141,6 +142,21 @@ create_COVID_ML_df <- function(coronavirus, num_cases_min = 4000, num_lag=10, in
       bind_rows(HUB) %>%
       arrange(-total_cases)
   }
+=======
+  # if(HubeiFlag == T){
+  #   HUB = coronavirus %>%
+  #     filter(Country.Region != 'Cruise Ship') %>%
+  #     group_by(Country.Region, type) %>%
+  #     filter(Province.State == 'Hubei') %>%
+  #     summarise(total_cases = sum(cases)) %>%
+  #     filter(type=='confirmed')
+  #   HUB[1,1] <- 'Hubei'
+  #   summary_df = summary_df %>%
+  #     filter(Country.Region != 'China') %>%
+  #     bind_rows(HUB) %>%
+  #     arrange(-total_cases)
+  # }
+>>>>>>> 6da032bb24eb9f9b8dd237cda4d9a66d62203169
   # filter by minimum number of cases
   countries_list = summary_df %>%
     filter(total_cases >= num_cases_min) %>%
@@ -170,7 +186,7 @@ create_COVID_ML_df <- function(coronavirus, num_cases_min = 4000, num_lag=10, in
 
 ## Looking at a single country -----
 
-country_ts <- country_timeseries(raw_data, 'USA', incidence = incidence_flag, plot = T) #create time series and plot
+country_ts <- country_timeseries(raw_data, 'CHN', incidence = incidence_flag, plot = T) #create time series and plot
 country_ts_lag <- create_lag(country_ts, num=10, incidence = incidence_flag)
 
 
@@ -178,6 +194,7 @@ country_ts_lag <- create_lag(country_ts, num=10, incidence = incidence_flag)
 
 output_df <- create_COVID_ML_df(coronavirus, num_cases_min = 1000, num_lag = 20, incidence_flag = incidence_flag)   # to change from cases per million to total cases, change default value in function defined above (country_timeseries)
 
+<<<<<<< HEAD
 # if(HubeiFlag == T){
 #   output_df$Country <- as.character(output_df$Country)
 #   output_df$Country[output_df$Country == "China"] <- "Hubei"
@@ -185,6 +202,15 @@ output_df <- create_COVID_ML_df(coronavirus, num_cases_min = 1000, num_lag = 20,
 #   output_df$ISO3[output_df$ISO3 == "CHN"] <- "HUB"
 #   
 # }
+=======
+if(HubeiFlag == T){
+  output_df$Country <- as.character(output_df$Country)
+  output_df$Country[output_df$Country == "China"] <- "Hubei"
+  output_df$ISO3 <- as.character(output_df$ISO3)
+  output_df$ISO3[output_df$ISO3 == "CHN"] <- "HUB"
+  
+}
+>>>>>>> 6da032bb24eb9f9b8dd237cda4d9a66d62203169
 
 write.csv(output_df, file="InputData/data_COVID_2020_04_02.csv")
 
