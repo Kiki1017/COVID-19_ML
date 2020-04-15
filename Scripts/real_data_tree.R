@@ -20,9 +20,9 @@ library(doParallel)
 library(magrittr)
 library(dplyr)
 library(gbm)
-library(party)
+# library(party)
 library(lattice)
-library(earth)
+# library(earth)
 
 #---randomForestFunction---#########################################################################################################################################################################
 
@@ -43,7 +43,7 @@ randomForestFunction <- function(name="confirmed_cum_per_million",dd=training_re
 name="confirmed_cum_per_million"
 dd="training_ready_sub2"
 
-caretFunction <- function(name="confirmed_cum_per_million",dd=training_ready_sub2, num_cores = detectCores(), n_trees = (1:30)*25, gbm_flag=T, earth_pois_flag=F, gam_flag=F, party_flag=F, rf_flag=T, all_flag=F){
+caretFunction <- function(name="confirmed_cum_per_million",dd=training_ready_sub2, num_cores = detectCores(), nasaction = na.pass, n_trees = (1:30)*25, gbm_flag=T, bayesglm_flag=F, gam_flag=F, glm_flag=F, rf_flag=T, all_flag=F){
   # enable parallel processing
   print('Number of cores being used = ')
   print(paste0(num_cores, ", of possible ", detectCores()," cores"))
@@ -82,89 +82,87 @@ caretFunction <- function(name="confirmed_cum_per_million",dd=training_ready_sub
                      ## Now specify the exact models 
                      ## to evaluate:
                      tuneGrid = gbmGrid,
-                     na.action = na.pass)
+                     na.action = nasaction)
     gbm.mod
   }else{gbm.mod <- NA}
 
-  if(earth_pois_flag==T | all_flag==T){
-    earth_pois_flag=T
-    print("Training earth.pois.mod...")
+  if(bayesglm_flag==T | all_flag==T){
+    bayesglm_flag=T
+    print("Training bayesglm.mod...")
     # Train a multivariatee adaptive regression spline with a poison
-    earth.pois.mod <- train(confirmed_cum_per_million ~ .,
+    bayesglm.mod <- train(mod_formula,
                             data = training_ready_sub2,
-                            method = "earth",
-                            glm=list(family=poisson),
+                            method = "bayesglm",
                             trControl = fitControl,
-                            na.action = na.exclude)
-    earth.pois.mod
-  }else{earth.pois.mod <- NA}
+                            na.action = nasaction)
+    bayesglm.mod
+  }else{bayesglm.mod <- NA}
   
   if(gam_flag==T | all_flag==T){
     gam_flag=T
     print("Training gam.mod...")
-    gam.mod <- train(confirmed_cum_per_million ~ .,
+    gam.mod <- train(mod_formula,
                      data = training_ready_sub2,
                      method = "gam",
                      trControl = fitControl,
                      tuneLength=tuneLength.num,
-                     na.action = na.exclude)
+                     na.action = nasaction)
     gam.mod
   }else{gam.mod <- NA}
   
-  if(party_flag==T | all_flag==T){
-    party_flag=T
-    print("Training party.mod ...")
-    party.mod <- train(confirmed_cum_per_million ~ .,
+  if(glm_flag==T | all_flag==T){
+    glm_flag=T
+    print("Training glm.mod ...")
+    glm.mod <- train(mod_formula,
                        data = training_ready_sub2,
-                       method = "ctree",
+                       method = "glm",
                        trControl = fitControl,
                        tuneLength=tuneLength.num,
-                       na.action = na.exclude)
-    party.mod
-  }else{party.mod <- NA}
+                       na.action = nasaction)
+    glm.mod
+  }else{glm.mod <- NA}
   
   if(rf_flag==T | all_flag==T){
     rf_flag=T
     print("Training rf.mod ...")
-    rf.mod <- train(confirmed_cum_per_million ~ .,
+    rf.mod <- train(mod_formula,
                     data = training_ready_sub2,
                     method = "rf",
                     trControl = fitControl,
                     tuneLength=tuneLength.num,
-                    na.action = na.exclude)
+                    na.action = nasaction)
     rf.mod
   }else{rf.mod <- NA}
   
-  flag_list <- c(gbm_flag, earth_pois_flag, gam_flag, party_flag, rf_flag)
-  tmp_list <- list(gbm=gbm.mod,earth_pois=earth.pois.mod,gam=gam.mod,party=party.mod,rf=rf.mod)[flag_list]
-  resamps <- resamples(tmp_list)
-  
-  print('training models finished. selecing best model baesd upon RMSE of training data with cross validation')
-  resamps
-  ss <- summary(resamps)
-  
-  trellis.par.set(caretTheme())
-  # dotplot(resamps, metric = "MAE")
-  x = dotplot(resamps, metric = "RMSE")
-  print(x)
-  
-  # compare models based upon:
-  comp_metric = 'RMSE'
-  
-  # select best model by training Rsquared
-  model_performance_df = resamps[['values']] %>%
-    select(-Resample) %>%
-    select(contains(comp_metric))
-  mean_model_perf = colMeans(model_performance_df)
-  model_name_long = names(mean_model_perf[which.min(mean_model_perf)])
-  model_name_tmp2 = paste0(strsplit(model_name_long, "~")[[1]][1], ".mod")
-  best_model_tmp2 = get(model_name_tmp2)$finalModel
-  
-  # best_model_tmp = gbm.mod
-  # best_model_tmp = earth.pois.mod
-  # best_model_tmp = gam.mod
-  # best_model_tmp = party.mod
-  # best_model_tmp = rf.mod
+  flag_list <- c(gbm_flag, bayesglm_flag, gam_flag, glm_flag, rf_flag)
+  if(sum(flag_list)>1){
+    tmp_list <- list(gbm=gbm.mod,bayesglm=bayesglm.mod,gam=gam.mod,glm=glm.mod,rf=rf.mod)[flag_list]
+    resamps <- resamples(tmp_list)
+    
+    print('training models finished. selecing best model baesd upon RMSE of training data with cross validation')
+    resamps
+    ss <- summary(resamps)
+    
+    trellis.par.set(caretTheme())
+    # dotplot(resamps, metric = "MAE")
+    x = dotplot(resamps, metric = "RMSE")
+    print(x)
+    
+    # compare models based upon:
+    comp_metric = 'RMSE'
+    
+    # select best model by training Rsquared
+    model_performance_df = resamps[['values']] %>%
+      select(-Resample) %>%
+      select(contains(comp_metric))
+    mean_model_perf = colMeans(model_performance_df)
+    model_name_long = names(mean_model_perf[which.min(mean_model_perf)])
+    model_name_tmp2 = paste0(strsplit(model_name_long, "~")[[1]][1], ".mod")
+    best_model_tmp2 = get(model_name_tmp2)$finalModel
+  }else{
+    model_name_tmp2 = paste0(c("gbm.mod","bayesglm.mod","gam.mod","glm.mod","rf.mod")[flag_list])
+    best_model_tmp2 = get(model_name_tmp2)$finalModel
+  }
   
   return(list(model_name_tmp = model_name_tmp2, best_model_tmp = best_model_tmp2))
 }
@@ -177,16 +175,18 @@ predictFunction <- function(name=best_model, mod_name=model_name, dd=testing_rea
   if("gbm.mod" == mod_name){
     dd %<>% mutate_if(is.factor,as.character)  
     dd %<>% mutate_if(is.character,as.numeric)
-    predict_tmp <- predict(name, dd, na.action = nasaction, n.trees = n_trees)
-  }else if("earth.pois.mod" == mod_name){
+    predict_tmp1 <- predict.gbm(name, dd, na.action = nasaction, n.trees = n_trees)
+    predict_tmp <- rowMeans(predict_tmp1)
+  }else if("bayesglm.mod" == mod_name){
     dd %<>% mutate_if(is.factor,as.character)  
     dd %<>% mutate_if(is.character,as.numeric)
+    dd %<>% mutate_if(is.integer,as.numeric)
     predict_tmp <- predict(name, dd, na.action = nasaction, n.trees = n_trees)
   }else if("gam.mod" == mod_name){
     dd %<>% mutate_if(is.factor,as.character)  
     dd %<>% mutate_if(is.character,as.numeric)
-    predict_tmp <- predict(name, dd, na.action = nasaction, n.trees = n_trees)
-  }else if("party.mod" == mod_name){
+    predict_tmp <- predict.gam(name, dd, na.action = nasaction)
+  }else if("glm.mod" == mod_name){
     dd %<>% mutate_if(is.factor,as.character)  
     dd %<>% mutate_if(is.character,as.numeric)
     dd %<>% mutate_if(is.integer,as.numeric)
@@ -205,11 +205,10 @@ predictFunction <- function(name=best_model, mod_name=model_name, dd=testing_rea
 # TRUE if you want to evaluate multiple models
 caret_flag <- T
 number_trees <- (1:30)*25
-gbm_flag=F
-earth_pois_flag=T
+gbm_flag=T
+bayesglm_flag=F
 gam_flag=F
-# PARTY STILL DOESNT WORK FOR THE VARIABLE IMPORTANCE
-party_flag=F
+glm_flag=T
 rf_flag=T
 all_flag=F
 
@@ -363,6 +362,7 @@ plot1 <- plot1 +
         axis.title.y = element_text(color="black",size = 13, angle = 90)
   )+
   # scale_x_continuous(breaks=seq(1, 10, 1))+
+  scale_colour_manual(values=randomColor(length(training_countries)), aesthetics = "colour") +
   theme(legend.text=element_text(size=9))+
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
         panel.background = element_blank(), axis.line = element_line(colour = "black"))
@@ -397,7 +397,7 @@ if(death_flag==F){
     training_ready_sub2 <- subset(training_ready_sub2, select=-c(confirmed_cum))
     testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(confirmed_cum))
     if(caret_flag == T){
-      caretRun <- caretFunction(name="confirmed_cum_per_million",dd=training_ready_sub2,n_trees = number_trees,gbm_flag=gbm_flag, earth_pois_flag=earth_pois_flag, gam_flag=gam_flag, party_flag=party_flag, rf_flag=rf_flag, all_flag=all_flag)
+      caretRun <- caretFunction(name="confirmed_cum_per_million",dd=training_ready_sub2,n_trees = number_trees,gbm_flag=gbm_flag, bayesglm_flag=bayesglm_flag, gam_flag=gam_flag, glm_flag=glm_flag, rf_flag=rf_flag, all_flag=all_flag)
       best_model <- caretRun[["best_model_tmp"]]
       model_name <- caretRun[["model_name_tmp"]]
     }
@@ -411,7 +411,7 @@ if(death_flag==F){
     # training_ready_sub2 <- subset(training_ready_sub2, select=-c(confirmed_cum_per_million))
     # testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(confirmed_cum_per_million))
     if(caret_flag == T){
-      caretRun <- caretFunction(name="confirmed_cum",dd=training_ready_sub2,n_trees = number_trees, earth_pois_flag=earth_pois_flag, gam_flag=gam_flag, party_flag=party_flag, rf_flag=rf_flag, all_flag=all_flag)
+      caretRun <- caretFunction(name="confirmed_cum",dd=training_ready_sub2,n_trees = number_trees, bayesglm_flag=bayesglm_flag, gam_flag=gam_flag, glm_flag=glm_flag, rf_flag=rf_flag, all_flag=all_flag)
       best_model <- caretRun[["best_model_tmp"]]
       model_name <- caretRun[["model_name_tmp"]]
     }
@@ -447,7 +447,7 @@ if(death_flag==F){
     training_ready_sub2 <- subset(training_ready_sub2, select=-c(death_cum))
     testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(death_cum))
     if(caret_flag == T){
-      caretRun <- caretFunction(name="death_cum_per_million",dd=training_ready_sub2,n_trees = number_trees, earth_pois_flag=earth_pois_flag, gam_flag=gam_flag, party_flag=party_flag, rf_flag=rf_flag, all_flag=all_flag)
+      caretRun <- caretFunction(name="death_cum_per_million",dd=training_ready_sub2,n_trees = number_trees, bayesglm_flag=bayesglm_flag, gam_flag=gam_flag, glm_flag=glm_flag, rf_flag=rf_flag, all_flag=all_flag)
       best_model <- caretRun[["best_model_tmp"]]
       model_name <- caretRun[["model_name_tmp"]]
     }
@@ -461,7 +461,7 @@ if(death_flag==F){
     # training_ready_sub2 <- subset(training_ready_sub2, select=-c(death_cum_per_million))
     # testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(death_cum_per_million))
     if(caret_flag == T){
-      caretRun <- caretFunction(name="death_cum",dd=training_ready_sub2,n_trees = number_trees, earth_pois_flag=earth_pois_flag, gam_flag=gam_flag, party_flag=party_flag, rf_flag=rf_flag, all_flag=all_flag)
+      caretRun <- caretFunction(name="death_cum",dd=training_ready_sub2,n_trees = number_trees, bayesglm_flag=bayesglm_flag, gam_flag=gam_flag, glm_flag=glm_flag, rf_flag=rf_flag, all_flag=all_flag)
       best_model <- caretRun[["best_model_tmp"]]
       model_name <- caretRun[["model_name_tmp"]]
     }
@@ -496,7 +496,7 @@ if(NPIflag2 == "lastNPI"){
 
 #---makePrediction---#########################################################################################################################################################################
 # p1 <- predict(best_model, testing_ready_pred[1:(breaker-1),], na.action = na.pass, n.trees = number_trees)
-p1 <- predictFunction(name=best_model, mod_name=model_name,dd=testing_ready_pred[1:(breaker-1),], n_trees = 1)
+p1 <- predictFunction(name=best_model, mod_name=model_name,dd=testing_ready_pred[1:(breaker-1),], n_trees = number_trees)
 for(i in breaker:nrow(testing_ready_pred)){
   for(l in 1:nLags){
     if(l==1){
@@ -592,7 +592,7 @@ plot_predict <- plot_predict +
   geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size = 3, colour = 'red', alpha = 0.1) +
   geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size = 2, colour = 'red', alpha = 0.2) +
   geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size = 1, colour = 'red', alpha = 0.5) +
-  geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), lwd=1.5, colour = 'deepskyblue3', linetype = "dashed",alpha=.7)
+  geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), lwd=.8, colour = 'deepskyblue3', linetype = "solid",alpha=.7)
 # geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size = 3, colour = 'red', alpha = 0.1, linetype = "3313") +
 # geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size = 2, colour = 'red', alpha = 0.2, linetype = "3313") +
 # geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size = 1, colour = 'red', alpha = 0.5, linetype = "3313") +
@@ -625,6 +625,7 @@ plot_predict <- plot_predict +
 
 
 #---variableImportancePlot---#########################################################################################################################################################################
+
 # Plot variable importance
 if(caret_flag==T){
   if("gbm.mod" == model_name){
@@ -632,7 +633,7 @@ if(caret_flag==T){
     df_tmp <- varImp(best_model)
     df <- as.data.frame(df_tmp)
     colnames(df) = c('imp')
-  }else if("earth.pois.mod" == model_name){
+  }else if("bayesglm.mod" == model_name){
     print("Model chosen by caret is: earth")
     df_tmp <- varImp(best_model)
     df <- as.data.frame(df_tmp)
@@ -642,9 +643,9 @@ if(caret_flag==T){
     df_tmp <- varImp(best_model)
     df <- as.data.frame(df_tmp)
     colnames(df) = c('imp')
-  }else if("party.mod" == model_name){
-    print("Model chosen by caret is: party")
-    df_tmp <- varimp(best_model)
+  }else if("glm.mod" == model_name){
+    print("Model chosen by caret is: glm")
+    df_tmp <- varImp(best_model)
     df <- as.data.frame(df_tmp)
     colnames(df) = c('imp')
   }else if("rf.mod"== model_name){
@@ -671,8 +672,10 @@ plot_varimp <- ggplot2::ggplot(df2) +
   theme_bw()
 
 #---cumulativePlot---#########################################################################################################################################################################
+rmse_val <- sqrt( sum( (plot1Data$prediction[1:(nrow(plot1Data)-projectionTime)] - plot1Data$actual[1:(nrow(plot1Data)-projectionTime)])^2 ) / (nrow(plot1Data)-projectionTime) )
+rmse_val <- round(rmse_val,3)
 gl <- list(plot1,plot_predict,plot_varimp)
-grid.arrange(grobs = gl, top = textGrob(paste0(testing_ready$FullName[1]), gp=gpar(fontsize=20)), layout_matrix = rbind(c(1,1,1,1,1,2,2,2),
+grid.arrange(grobs = gl, top = textGrob(paste0(testing_ready$FullName[1]," ",model_name," RMSE = ",rmse_val), gp=gpar(fontsize=20)), layout_matrix = rbind(c(1,1,1,1,1,2,2,2),
                                                                                                                         c(1,1,1,1,1,2,2,2),
                                                                                                                         c(1,1,1,1,1,2,2,2),
                                                                                                                         c(3,3,3,3,3,3,3,3),
@@ -680,7 +683,6 @@ grid.arrange(grobs = gl, top = textGrob(paste0(testing_ready$FullName[1]), gp=gp
                                                                                                                         c(3,3,3,3,3,3,3,3),
                                                                                                                         c(3,3,3,3,3,3,3,3),
                                                                                                                         c(3,3,3,3,3,3,3,3)))
-
 
 
 # rpart.plot(best_model)
