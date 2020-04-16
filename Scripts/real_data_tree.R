@@ -43,7 +43,7 @@ randomForestFunction <- function(name="confirmed_cum_per_million",dd=training_re
 name="confirmed_cum_per_million"
 dd="training_ready_sub2"
 
-caretFunction <- function(name="confirmed_cum_per_million",dd=training_ready_sub2, num_cores = detectCores(), nasaction = na.pass, n_trees = (1:30)*25, gbm_flag=T, bayesglm_flag=F, gam_flag=F, glm_flag=F, rf_flag=T, all_flag=F){
+caretFunction <- function(name="confirmed_cum_per_million",dd=training_ready_sub2, num_cores = detectCores(), nasaction = na.omit, n_trees = (1:30)*25, gbm_flag=T, bayesglm_flag=F, gam_flag=F, glm_flag=F, rf_flag=T, all_flag=F){
   # enable parallel processing
   print('Number of cores being used = ')
   print(paste0(num_cores, ", of possible ", detectCores()," cores"))
@@ -205,10 +205,10 @@ predictFunction <- function(name=best_model, mod_name=model_name, dd=testing_rea
 # TRUE if you want to evaluate multiple models
 caret_flag <- T
 number_trees <- (1:30)*25
-gbm_flag=T
+gbm_flag=F
 bayesglm_flag=F
 gam_flag=F
-glm_flag=T
+glm_flag=F
 rf_flag=T
 all_flag=F
 
@@ -242,8 +242,8 @@ testing_countries <- c("GBR")
 # make country lists, these are the ones that we have NPI data collected for
 # https://docs.google.com/spreadsheets/d/1vrKvs52OAxuB7x2kT9r1q6IcIBxGEQsNRHsK_o7h3jo/edit#gid=378237553
 # training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","HUB","KOR","USA","SWE","AUT","CHE","DEU","FRA")
-training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","HUB","KOR","USA","SWE","AUT","CHE","DEU","FRA","DZA","IRN","CAN","TUR","BEL","ANT","PRT","ISR","RUS","NOR","IRL","AUS","IND","DNK","CHL","CZE","JPN","UKR","MAR","ARG","SGP","ROU")
-# training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","USA","SWE","AUT","CHE","DEU","FRA")
+# training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","HUB","KOR","USA","SWE","AUT","CHE","DEU","FRA","DZA","IRN","CAN","TUR","BEL","ANT","PRT","ISR","RUS","NOR","IRL","AUS","IND","DNK","CHL","CZE","JPN","UKR","MAR","ARG","SGP","ROU")
+training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","USA","SWE","AUT","CHE","DEU","FRA")
 training_countries <- training_countries_all[which(training_countries_all != testing_countries)]
 
 #---trainingTestingDataFrames---#########################################################################################################################################################################
@@ -274,7 +274,7 @@ for(i in 1:length(testing_countries)){
   }
   testing_subset_aligned <- testing_subset[start:nrow(testing_subset),]
   tmp <- testing_subset_aligned[1:projectionTime,]
-  tmp[,grep("cum|Social_Distancing|Quaranting_Cases|Close_Border|date|confirmed", colnames(tmp))] <- NA
+  tmp[,grep("cum|Social_Distancing|Quaranting_Cases|Close_Border|Google|date|confirmed", colnames(tmp))] <- NA
   tmp$Social_Distancing <- NA
   tmp$Quaranting_Cases <- NA
   tmp$Close_Border <- NA
@@ -294,8 +294,8 @@ for(i in 1:length(testing_countries)){
 # We will worry about the NPIflag2 later to specify if we want to fill the projection timeperiod the same way
 # NPIflag1 <- "autofill"
 
-peek_at_NPIs_training1 <- training_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(training_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border",names(training_ready))])]
-NPInames <- names(training_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border",names(training_ready))]
+peek_at_NPIs_training1 <- training_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(training_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google",names(training_ready))])]
+NPInames <- names(training_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google",names(training_ready))]
 if(NPIflag1 == "autofill"){
   for(i in 1:nrow(training_ready)){
     for(j in NPInames){
@@ -303,10 +303,10 @@ if(NPIflag1 == "autofill"){
     }
   }
 }
-peek_at_NPIs_training2 <- training_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(training_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border",names(training_ready))])]
+peek_at_NPIs_training2 <- training_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(training_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google",names(training_ready))])]
 
-peek_at_NPIs_testing1 <- testing_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(testing_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border",names(testing_ready))])]
-NPInames <- names(testing_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border",names(testing_ready))]
+peek_at_NPIs_testing1 <- testing_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(testing_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google",names(testing_ready))])]
+NPInames <- names(testing_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google",names(testing_ready))]
 if(NPIflag1 == "autofill"){
   for(i in 1:(nrow(testing_ready)-projectionTime)){
     for(j in NPInames){
@@ -314,7 +314,7 @@ if(NPIflag1 == "autofill"){
     }
   }
 }
-peek_at_NPIs_testing2 <- testing_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(testing_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border",names(testing_ready))])]
+peek_at_NPIs_testing2 <- testing_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(testing_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google",names(testing_ready))])]
 
 
 #---first plot---#########################################################################################################################################################################
@@ -482,7 +482,7 @@ breaker <- nrow(testing_ready_pred)-projectionTime+1
 # testing_ready_pred[(breaker-1):(breaker+1),grep("confirmed_cum_per_million", colnames(testing_ready_pred))]
 
 # Note this code assumes that there are no NAs present in the NPI data
-NPInames <- names(testing_ready_pred)[grep("Social_Distancing|Quaranting_Cases|Close_Border",names(testing_ready_pred))]
+NPInames <- names(testing_ready_pred)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google",names(testing_ready_pred))]
 if(NPIflag2 == "lastNPI"){
   for(i in breaker:nrow(testing_ready_pred)){
     for(j in NPInames){
@@ -675,14 +675,22 @@ plot_varimp <- ggplot2::ggplot(df2) +
 rmse_val <- sqrt( sum( (plot1Data$prediction[1:(nrow(plot1Data)-projectionTime)] - plot1Data$actual[1:(nrow(plot1Data)-projectionTime)])^2 ) / (nrow(plot1Data)-projectionTime) )
 rmse_val <- round(rmse_val,3)
 gl <- list(plot1,plot_predict,plot_varimp)
-grid.arrange(grobs = gl, top = textGrob(paste0(testing_ready$FullName[1]," ",model_name," RMSE = ",rmse_val), gp=gpar(fontsize=20)), layout_matrix = rbind(c(1,1,1,1,1,2,2,2),
-                                                                                                                        c(1,1,1,1,1,2,2,2),
-                                                                                                                        c(1,1,1,1,1,2,2,2),
-                                                                                                                        c(3,3,3,3,3,3,3,3),
-                                                                                                                        c(3,3,3,3,3,3,3,3),
-                                                                                                                        c(3,3,3,3,3,3,3,3),
-                                                                                                                        c(3,3,3,3,3,3,3,3),
-                                                                                                                        c(3,3,3,3,3,3,3,3)))
+grid.arrange(grobs = gl, top = textGrob(paste0(testing_ready$FullName[1]," ",model_name," RMSE = ",rmse_val), gp=gpar(fontsize=20)), layout_matrix = rbind(c(1,1,1,1,1,3,3,3),
+                                                                                                                                                           c(1,1,1,1,1,3,3,3),
+                                                                                                                                                           c(1,1,1,1,1,3,3,3),
+                                                                                                                                                           c(1,1,1,1,1,3,3,3),
+                                                                                                                                                           c(2,2,2,2,2,3,3,3),
+                                                                                                                                                           c(2,2,2,2,2,3,3,3),
+                                                                                                                                                           c(2,2,2,2,2,3,3,3),
+                                                                                                                                                           c(2,2,2,2,2,3,3,3)))
+# grid.arrange(grobs = gl, top = textGrob(paste0(testing_ready$FullName[1]," ",model_name," RMSE = ",rmse_val), gp=gpar(fontsize=20)), layout_matrix = rbind(c(1,1,1,1,1,2,2,2),
+#                                                                                                                         c(1,1,1,1,1,2,2,2),
+#                                                                                                                         c(1,1,1,1,1,2,2,2),
+#                                                                                                                         c(3,3,3,3,3,3,3,3),
+#                                                                                                                         c(3,3,3,3,3,3,3,3),
+#                                                                                                                         c(3,3,3,3,3,3,3,3),
+#                                                                                                                         c(3,3,3,3,3,3,3,3),
+#                                                                                                                         c(3,3,3,3,3,3,3,3)))
 
 
 # rpart.plot(best_model)
