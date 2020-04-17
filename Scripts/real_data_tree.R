@@ -169,7 +169,7 @@ caretFunction <- function(name="confirmed_cum_per_million",dd=training_ready_sub
 
 #---predictFunction---#########################################################################################################################################################################
 
-predictFunction <- function(name=best_model, mod_name=model_name, dd=testing_ready_pred, n_trees = (1:30)*25, nasaction = na.pass){
+predictFunction <- function(name=best_model, mod_name=model_name, dd=testing_ready_pred, n_trees = (1:30)*25, nasaction = na.omit){
   # enable parallel processing
   # predict_df <- eval(parse(text=paste(dd)))
   if("gbm.mod" == mod_name){
@@ -217,9 +217,13 @@ incidence_flag <- T
 # TRUE if you want to do deaths instead of cases
 death_flag <- F
 incidence_start_point <- 0.3
-# if we are doing deaths, we want incidence start point to be about 5.9% of the case one becuase that's the approx mortality rate
-if(death_flag==T){incidence_start_point <- incidence_start_point*(5.9/100)}
 count_start_point <- 100
+# if we are doing deaths, we want incidence start point to be about 5.9% of the case one becuase that's the approx mortality rate
+if(death_flag==T){
+  incidence_start_point <- incidence_start_point*(5.9/100)
+  count_start_point <- count_start_point*(5.9/100)
+}
+
 nLags <- 10
 projectionTime <- 14
 NPIflag1 <- "autofill"
@@ -233,11 +237,11 @@ data_clean$date <- as.Date(data_clean$date)
 glimpse(data_clean)
 summary(data_clean)
 
-# testing_countries <- c("USA")
+testing_countries <- c("USA")
 # testing_countries <- c("ITA")
 # testing_countries <- c("BRA")
 # testing_countries <- c("ESP")
-testing_countries <- c("GBR")
+# testing_countries <- c("GBR")
 
 # make country lists, these are the ones that we have NPI data collected for
 # https://docs.google.com/spreadsheets/d/1vrKvs52OAxuB7x2kT9r1q6IcIBxGEQsNRHsK_o7h3jo/edit#gid=378237553
@@ -250,10 +254,14 @@ training_countries <- training_countries_all[which(training_countries_all != tes
 # create training dataframe
 for(i in 1:length(training_countries)){
   training_subset <- subset(data_clean,ISO3 %in% training_countries[i])
-  if(incidence_flag==T){
+  if(incidence_flag==T & death_flag == F){
     start <- which(training_subset$confirmed_cum_per_million >= incidence_start_point)[1]
-  }else{
+  }else if(incidence_flag==T & death_flag == T){
+      start <- which(training_subset$death_cum_per_million >= incidence_start_point)[1]
+  }else if(incidence_flag==F & death_flag == F){
     start <- which(training_subset$confirmed_cum >= count_start_point)[1]
+  }else if(incidence_flag==F & death_flag == T){
+    start <- which(training_subset$death_cum >= count_start_point)[1]
   }
   
   training_subset_aligned <- training_subset[start:nrow(training_subset),]
@@ -267,10 +275,14 @@ for(i in 1:length(training_countries)){
 # create testing dataframe
 for(i in 1:length(testing_countries)){
   testing_subset <- subset(data_clean,ISO3 %in% testing_countries[i])
-  if(incidence_flag==T){
+  if(incidence_flag==T & death_flag == F){
     start <- which(testing_subset$confirmed_cum_per_million >= incidence_start_point)[1]
-  }else{
+  }else if(incidence_flag==T & death_flag == T){
+    start <- which(testing_subset$death_cum_per_million >= incidence_start_point)[1]
+  }else if(incidence_flag==F & death_flag == F){
     start <- which(testing_subset$confirmed_cum >= count_start_point)[1]
+  }else if(incidence_flag==F & death_flag == T){
+    start <- which(testing_subset$death_cum >= count_start_point)[1]
   }
   testing_subset_aligned <- testing_subset[start:nrow(testing_subset),]
   tmp <- testing_subset_aligned[1:projectionTime,]
@@ -296,22 +308,48 @@ for(i in 1:length(testing_countries)){
 
 peek_at_NPIs_training1 <- training_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(training_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google",names(training_ready))])]
 NPInames <- names(training_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google",names(training_ready))]
+# View(training_ready[,c(NPInames)])
+counter <- 1
+prevcountry <- training_ready$Country.x[1]
 if(NPIflag1 == "autofill"){
-  for(i in 1:nrow(training_ready)){
-    for(j in NPInames){
-      if(is.na(training_ready[[j]][i])){training_ready[[j]][i] <- training_ready[[j]][i-1]}
+  for(i in 2:nrow(training_ready)){
+    curcountry <- training_ready$Country.x[i]
+    if(curcountry == prevcountry){
+      counter <- counter+1
+    }else{
+      counter <- 1
     }
+
+    for(j in NPInames){
+      if(is.na(training_ready[[j]][i]) && counter > 14){
+        training_ready[[j]][i] <- training_ready[[j]][i-1]
+        }
+    }
+    prevcountry <- curcountry
   }
 }
 peek_at_NPIs_training2 <- training_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(training_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google",names(training_ready))])]
 
+
 peek_at_NPIs_testing1 <- testing_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(testing_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google",names(testing_ready))])]
 NPInames <- names(testing_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google",names(testing_ready))]
+counter <- 1
+prevcountry <- testing_ready$Country.x[1]
 if(NPIflag1 == "autofill"){
-  for(i in 1:(nrow(testing_ready)-projectionTime)){
-    for(j in NPInames){
-      if(is.na(testing_ready[[j]][i])){testing_ready[[j]][i] <- testing_ready[[j]][i-1]}
+  for(i in 2:nrow(testing_ready)){
+    curcountry <- testing_ready$Country.x[i]
+    if(curcountry == prevcountry){
+      counter <- counter+1
+    }else{
+      counter <- 1
     }
+    
+    for(j in NPInames){
+      if(is.na(testing_ready[[j]][i]) && counter > 14){
+        testing_ready[[j]][i] <- testing_ready[[j]][i-1]
+      }
+    }
+    prevcountry <- curcountry
   }
 }
 peek_at_NPIs_testing2 <- testing_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(testing_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google",names(testing_ready))])]
@@ -411,7 +449,7 @@ if(death_flag==F){
     # training_ready_sub2 <- subset(training_ready_sub2, select=-c(confirmed_cum_per_million))
     # testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(confirmed_cum_per_million))
     if(caret_flag == T){
-      caretRun <- caretFunction(name="confirmed_cum",dd=training_ready_sub2,n_trees = number_trees, bayesglm_flag=bayesglm_flag, gam_flag=gam_flag, glm_flag=glm_flag, rf_flag=rf_flag, all_flag=all_flag)
+      caretRun <- caretFunction(name="confirmed_cum",dd=training_ready_sub2,n_trees = number_trees,gbm_flag=gbm_flag, bayesglm_flag=bayesglm_flag, gam_flag=gam_flag, glm_flag=glm_flag, rf_flag=rf_flag, all_flag=all_flag)
       best_model <- caretRun[["best_model_tmp"]]
       model_name <- caretRun[["model_name_tmp"]]
     }
@@ -447,7 +485,7 @@ if(death_flag==F){
     training_ready_sub2 <- subset(training_ready_sub2, select=-c(death_cum))
     testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(death_cum))
     if(caret_flag == T){
-      caretRun <- caretFunction(name="death_cum_per_million",dd=training_ready_sub2,n_trees = number_trees, bayesglm_flag=bayesglm_flag, gam_flag=gam_flag, glm_flag=glm_flag, rf_flag=rf_flag, all_flag=all_flag)
+      caretRun <- caretFunction(name="death_cum_per_million",dd=training_ready_sub2,n_trees = number_trees,gbm_flag=gbm_flag, bayesglm_flag=bayesglm_flag, gam_flag=gam_flag, glm_flag=glm_flag, rf_flag=rf_flag, all_flag=all_flag)
       best_model <- caretRun[["best_model_tmp"]]
       model_name <- caretRun[["model_name_tmp"]]
     }
@@ -461,7 +499,7 @@ if(death_flag==F){
     # training_ready_sub2 <- subset(training_ready_sub2, select=-c(death_cum_per_million))
     # testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(death_cum_per_million))
     if(caret_flag == T){
-      caretRun <- caretFunction(name="death_cum",dd=training_ready_sub2,n_trees = number_trees, bayesglm_flag=bayesglm_flag, gam_flag=gam_flag, glm_flag=glm_flag, rf_flag=rf_flag, all_flag=all_flag)
+      caretRun <- caretFunction(name="death_cum",dd=training_ready_sub2,n_trees = number_trees,gbm_flag=gbm_flag, bayesglm_flag=bayesglm_flag, gam_flag=gam_flag, glm_flag=glm_flag, rf_flag=rf_flag, all_flag=all_flag)
       best_model <- caretRun[["best_model_tmp"]]
       model_name <- caretRun[["model_name_tmp"]]
     }
