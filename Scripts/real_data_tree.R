@@ -22,6 +22,8 @@ library(dplyr)
 library(gbm)
 # library(party)
 library(lattice)
+library(zoo)
+library(EpiEstim)
 # library(earth)
 
 #---randomForestFunction---#########################################################################################################################################################################
@@ -57,11 +59,11 @@ caretFunction <- function(name="confirmed_cum_per_million",dd=training_ready_sub
   # implemnting CARET with 10-fold cross-valication
   fitControl <- trainControl(## 10-fold CV
     method = "repeatedcv",
-    number = 10,
-    # number = 2,
+    # number = 10,
+    number = 2,
     ## repeated ten times
-    repeats = 10,
-    # repeats = 2,
+    # repeats = 10,
+    repeats = 2,
     allowParallel = TRUE)
   tuneLength.num <- 5
   # Train a stochastic gradient boosting model ('gbm')
@@ -224,7 +226,7 @@ if(death_flag==T){
   count_start_point <- count_start_point*(5.9/100)
 }
 
-nLags <- 10
+nLags <- 1
 projectionTime <- 14
 NPIflag1 <- "autofill"
 NPIflag2 <- "lastNPI"
@@ -246,9 +248,82 @@ testing_countries <- c("USA")
 # make country lists, these are the ones that we have NPI data collected for
 # https://docs.google.com/spreadsheets/d/1vrKvs52OAxuB7x2kT9r1q6IcIBxGEQsNRHsK_o7h3jo/edit#gid=378237553
 # training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","HUB","KOR","USA","SWE","AUT","CHE","DEU","FRA")
+# training_countries_all <- c("ITA","FRA")
 training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","HUB","KOR","USA","SWE","AUT","CHE","DEU","FRA","DZA","IRN","CAN","TUR","BEL","ANT","PRT","ISR","RUS","NOR","IRL","AUS","IND","DNK","CHL","CZE","JPN","UKR","MAR","ARG","SGP","ROU")
 # training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","USA","SWE","AUT","CHE","DEU","FRA")
 training_countries <- training_countries_all[which(training_countries_all != testing_countries)]
+
+#---Estimating reproduction numbers, R0---#########################################################################################################################################################################
+library(tidyverse)
+#"SI for Serial Intervals.
+# Determination of the serial interval, the time between the start of symptoms in the primary patient (infector) 
+# and onset of symptoms in the patient receiving that infection from the infector (the infectee)"
+# Table 1 from https://www.medrxiv.org/content/10.1101/2020.04.13.20062760v1
+#"we calculate a weighted mean of the published parameters and inferred a serial interval described 
+# by a gamma distribution, parameterised with mean SI of 4.56 days (credible interval: 2.54 - 7.36) 
+# and standard deviation 4.53 days (credible interval 4.17 - 5.05)."
+
+serialIntervals = tibble(
+  mean_si_estimate = c(3.96, 6.3, 4.22, 4.56, 3.95, 5.21, 4.7, 7.5,6.6),
+  mean_si_estimate_low_ci = c(3.53, 5.2, 3.43, 2.69,-4.47, -3.35, 3.7, 5.3, 0.7),
+  mean_si_estimate_high_ci = c(4.39, 7.6, 5.01, 6.42, 12.51,13.94, 6.0, 19.0, 19.0),
+  std_si_estimate = c(4.75,4.2, 0.4, 0.95, 4.24, 4.32, 2.3, 3.4, NA),
+  std_si_estimate_low_ci = c(4.46, 3.1, NA, NA, 4.03, 4.06, 1.6, NA, NA),
+  std_si_estimate_high_ci = c(5.07, 5.3, NA, NA, 4.95, 5.58, 3.5, NA, NA),
+  sample_size = c(468,48,135,93,45,54,28,16,90),
+  population = c("China", "Shenzhen","Taijin","Singapore","Taijin","Singapore", "SE Asia", "Wuhan","Italy"),
+  source = c(
+    "Zhanwei Du et al. Serial Interval of COVID-19 among Publicly Reported Confirmed Cases. Emerging Infectious Disease journal 26, (2020)",
+    "Bi, Q. et al. Epidemiology and Transmission of COVID-19 in Shenzhen China: Analysis of 391 cases and 1,286 of their close contacts. Infectious Diseases (except HIV/AIDS) (2020) doi:10.1101/2020.03.03.20028423",
+    "Tindale, L. et al. Transmission interval estimates suggest pre-symptomatic spread of COVID-19. Epidemiology (2020) doi:10.1101/2020.03.03.20029983",
+    "Tindale, L. et al. Transmission interval estimates suggest pre-symptomatic spread of COVID-19. Epidemiology (2020) doi:10.1101/2020.03.03.20029983",
+    "Ganyani, T. et al. Estimating the generation interval for COVID-19 based on symptom onset data. Infectious Diseases (except HIV/AIDS) (2020) doi:10.1101/2020.03.05.20031815",
+    "Ganyani, T. et al. Estimating the generation interval for COVID-19 based on symptom onset data. Infectious Diseases (except HIV/AIDS) (2020) doi:10.1101/2020.03.05.20031815",
+    "Nishiura, H., Linton, N. M. & Akhmetzhanov, A. R. Serial interval of novel coronavirus (COVID-19) infections. Int. J. Infect. Dis. (2020) doi:10.1016/j.ijid.2020.02.060",
+    "Li, Q. et al. Early Transmission Dynamics in Wuhan, China, of Novel Coronavirus-Infected Pneumonia. N. Engl. J. Med. (2020) doi:10.1056/NEJMoa2001316",
+    "Cereda, D. et al. The early phase of the COVID-19 outbreak in Lombardy, Italy. arXiv [q-bio.PE] (2020)")
+)
+
+unk=function(x) ifelse(is.na(x),"unk",x)
+
+SItable1 = serialIntervals %>% mutate(
+  `Mean SI\n(95% CrI) days`=paste0(mean_si_estimate,"\n(",unk(mean_si_estimate_low_ci),"-",
+                                   unk(mean_si_estimate_high_ci),")"),
+  `Std SI\n(95% CrI) days`=paste0(unk(std_si_estimate),"\n(",unk(std_si_estimate_low_ci),"-",unk(std_si_estimate_high_ci),")")
+) %>% select(-contains("estimate")) %>% select(
+  `Reference`=source,
+  `Mean SI\n(95% CrI) days`,
+  `Std SI\n(95% CrI) days`,
+  `N`=sample_size,
+  `Population`=population
+)
+
+#### Calculate the mean serial intervals ----
+
+wtSIs = serialIntervals %>% summarise(
+  mean_si = weighted.mean(mean_si_estimate,sample_size,na.rm = TRUE),
+  min_mean_si = weighted.mean(mean_si_estimate_low_ci,sample_size,na.rm = TRUE),
+  max_mean_si = weighted.mean(mean_si_estimate_high_ci,sample_size,na.rm = TRUE),
+  std_si  = weighted.mean(ifelse(is.na(std_si_estimate_low_ci),NA,1)*std_si_estimate,sample_size,na.rm = TRUE),
+  min_std_si  = weighted.mean(std_si_estimate_low_ci,sample_size,na.rm = TRUE),
+  max_std_si  = weighted.mean(std_si_estimate_high_ci,sample_size,na.rm = TRUE)
+  #total = sum(sample_size)
+) %>% mutate(
+  std_mean_si = (max_mean_si - min_mean_si) / 3.92, # TODO: fit gamma
+  std_std_si = (max_std_si - min_std_si) / 3.92
+)
+
+#### Construct a R_t timeseries for Regional breakdowns ----
+config = make_config(list(si_parametric_distr = "G",
+                          mean_si = wtSIs$mean_si, 
+                          std_mean_si = wtSIs$std_mean_si,
+                          min_mean_si = wtSIs$min_mean_si, 
+                          max_mean_si = wtSIs$max_mean_si,
+                          std_si = wtSIs$std_si, 
+                          std_std_si = wtSIs$std_si,
+                          min_std_si = wtSIs$min_std_si, 
+                          max_std_si = wtSIs$max_std_si), 
+                     method="uncertain_si")
 
 #---trainingTestingDataFrames---#########################################################################################################################################################################
 # create training dataframe
@@ -266,6 +341,25 @@ for(i in 1:length(training_countries)){
   
   training_subset_aligned <- training_subset[start:nrow(training_subset),]
   training_subset_aligned$time <- c(1:nrow(training_subset_aligned))
+
+  toCalcR0 <- training_subset_aligned[,c("date","confirmed")]
+  colnames(toCalcR0) <- c("dates","I")
+  toCalcR0$I[toCalcR0$I<0] <- NA
+  #Get of erroneous negative counts... they sneak throught the API sometimes. Lets linearly interpolate them:
+  toCalcR0$I <- na.approx(toCalcR0$I)
+  res_uncertain_si <- estimate_R(toCalcR0,
+                                 method = "uncertain_si",
+                                 config = config)
+  training_subset_aligned$R0 <- NA 
+  training_subset_aligned$R0[head(res_uncertain_si[["R"]]$`t_start`,1):tail(res_uncertain_si[["R"]]$`t_start`,1)] <- res_uncertain_si[["R"]]$`Mean(R)`
+  # Autofill beginning R0s with first value
+  training_subset_aligned$R0[1:head(res_uncertain_si[["R"]]$`t_start`,1)] <- head(res_uncertain_si[["R"]]$`Mean(R)`,1)
+  # Autofill ending R0s with last value
+  training_subset_aligned$R0[tail(res_uncertain_si[["R"]]$`t_start`,1):nrow(training_subset_aligned)] <- tail(res_uncertain_si[["R"]]$`Mean(R)`,1)
+  plot.new()
+  plot(res_uncertain_si, legend = T)
+  mtext(training_countries[i], outer=TRUE,  cex=1, line=-.5)
+  
   if(i==1){
     training_ready <- training_subset_aligned
   }else{
@@ -285,13 +379,33 @@ for(i in 1:length(testing_countries)){
     start <- which(testing_subset$death_cum >= count_start_point)[1]
   }
   testing_subset_aligned <- testing_subset[start:nrow(testing_subset),]
+  
+  toCalcR0 <- testing_subset_aligned[,c("date","confirmed")]
+  colnames(toCalcR0) <- c("dates","I")
+  toCalcR0$I[toCalcR0$I<0] <- NA
+  #Get of erroneous negative counts... they sneak throught the API sometimes. Lets linearly interpolate them:
+  toCalcR0$I <- na.approx(toCalcR0$I)
+  res_uncertain_si <- estimate_R(toCalcR0,
+                                 method = "uncertain_si",
+                                 config = config)
+  testing_subset_aligned$R0 <- NA 
+  testing_subset_aligned$R0[head(res_uncertain_si[["R"]]$`t_start`,1):tail(res_uncertain_si[["R"]]$`t_start`,1)] <- res_uncertain_si[["R"]]$`Mean(R)`
+  # Autofill beginning R0s with first value
+  testing_subset_aligned$R0[1:head(res_uncertain_si[["R"]]$`t_start`,1)] <- head(res_uncertain_si[["R"]]$`Mean(R)`,1)
+  # Autofill ending R0s with last value
+  testing_subset_aligned$R0[tail(res_uncertain_si[["R"]]$`t_start`,1):nrow(testing_subset_aligned)] <- tail(res_uncertain_si[["R"]]$`Mean(R)`,1)
+  plot.new()
+  plot(res_uncertain_si, legend = T)
+  mtext(training_countries[i], outer=TRUE,  cex=1, line=-.5)
+  
   tmp <- testing_subset_aligned[1:projectionTime,]
-  tmp[,grep("cum|Social_Distancing|Quaranting_Cases|Close_Border|Google|date|confirmed", colnames(tmp))] <- NA
+  tmp[,grep("cum|Social_Distancing|Quaranting_Cases|Close_Border|Google|R0|date|confirmed", colnames(tmp))] <- NA
   tmp$Social_Distancing <- NA
   tmp$Quaranting_Cases <- NA
   tmp$Close_Border <- NA
   testing_subset_aligned_predictNA <- rbind(testing_subset_aligned,tmp)
   testing_subset_aligned_predictNA$time <- c(1:nrow(testing_subset_aligned_predictNA))
+  
   if(i==1){
     testing_ready <- testing_subset_aligned_predictNA
   }else{
@@ -306,8 +420,8 @@ for(i in 1:length(testing_countries)){
 # We will worry about the NPIflag2 later to specify if we want to fill the projection timeperiod the same way
 # NPIflag1 <- "autofill"
 
-peek_at_NPIs_training1 <- training_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(training_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google",names(training_ready))])]
-NPInames <- names(training_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google",names(training_ready))]
+peek_at_NPIs_training1 <- training_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(training_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(training_ready))])]
+NPInames <- names(training_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(training_ready))]
 # View(training_ready[,c(NPInames)])
 counter <- 1
 prevcountry <- training_ready$Country.x[1]
@@ -328,11 +442,11 @@ if(NPIflag1 == "autofill"){
     prevcountry <- curcountry
   }
 }
-peek_at_NPIs_training2 <- training_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(training_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google",names(training_ready))])]
+peek_at_NPIs_training2 <- training_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(training_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(training_ready))])]
 
 
-peek_at_NPIs_testing1 <- testing_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(testing_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google",names(testing_ready))])]
-NPInames <- names(testing_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google",names(testing_ready))]
+peek_at_NPIs_testing1 <- testing_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(testing_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(testing_ready))])]
+NPInames <- names(testing_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(testing_ready))]
 counter <- 1
 prevcountry <- testing_ready$Country.x[1]
 if(NPIflag1 == "autofill"){
@@ -352,7 +466,7 @@ if(NPIflag1 == "autofill"){
     prevcountry <- curcountry
   }
 }
-peek_at_NPIs_testing2 <- testing_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(testing_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google",names(testing_ready))])]
+peek_at_NPIs_testing2 <- testing_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(testing_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(testing_ready))])]
 
 
 #---first plot---#########################################################################################################################################################################
@@ -411,7 +525,7 @@ str(testing_ready)
 
 # Create a Random Forest model with default parameters
 if(death_flag==F){
-  training_ready_sub2 <- subset(training_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered,time))
+  training_ready_sub2 <- subset(training_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered))
   training_ready_sub2 <- training_ready_sub2[,grep("death|MalePercent|FemalePercent", colnames(training_ready_sub2),invert = T)]
   for(i in (nLags+1):100){
     training_ready_sub2 <- training_ready_sub2[,grep(paste0(sprintf("lag_%02d", i)), colnames(training_ready_sub2),invert = T)]
@@ -421,7 +535,7 @@ if(death_flag==F){
   training_ready_sub2 %<>% mutate_if(is.character,as.numeric)
   training_ready_sub2 %<>% mutate_if(is.integer,as.numeric)
   # remove more columns we don't want in the model
-  testing_ready_sub2 <- subset(testing_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered,time))
+  testing_ready_sub2 <- subset(testing_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered))
   testing_ready_sub2 <- testing_ready_sub2[,grep("death|MalePercent|FemalePercent", colnames(testing_ready_sub2),invert = T)]
   for(i in (nLags+1):100){
     testing_ready_sub2 <- testing_ready_sub2[,grep(paste0(sprintf("lag_%02d", i)), colnames(testing_ready_sub2),invert = T)]
@@ -461,7 +575,7 @@ if(death_flag==F){
     }
   }
 }else if(death_flag==T){
-  training_ready_sub2 <- subset(training_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered,time))
+  training_ready_sub2 <- subset(training_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recoveredd))
   training_ready_sub2 <- training_ready_sub2[,grep("confirmed|MalePercent|FemalePercent", colnames(training_ready_sub2),invert = T)]
   for(i in (nLags+1):100){
     training_ready_sub2 <- training_ready_sub2[,grep(paste0(sprintf("lag_%02d", i)), colnames(training_ready_sub2),invert = T)]
@@ -471,7 +585,7 @@ if(death_flag==F){
   training_ready_sub2 %<>% mutate_if(is.character,as.numeric)
   training_ready_sub2 %<>% mutate_if(is.integer,as.numeric)
   # remove more columns we don't want in the model
-  testing_ready_sub2 <- subset(testing_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered,time))
+  testing_ready_sub2 <- subset(testing_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered))
   testing_ready_sub2 <- testing_ready_sub2[,grep("confirmed|MalePercent|FemalePercent", colnames(testing_ready_sub2),invert = T)]
   for(i in (nLags+1):100){
     testing_ready_sub2 <- testing_ready_sub2[,grep(paste0(sprintf("lag_%02d", i)), colnames(testing_ready_sub2),invert = T)]
@@ -520,7 +634,7 @@ breaker <- nrow(testing_ready_pred)-projectionTime+1
 # testing_ready_pred[(breaker-1):(breaker+1),grep("confirmed_cum_per_million", colnames(testing_ready_pred))]
 
 # Note this code assumes that there are no NAs present in the NPI data
-NPInames <- names(testing_ready_pred)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google",names(testing_ready_pred))]
+NPInames <- names(testing_ready_pred)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(testing_ready_pred))]
 if(NPIflag2 == "lastNPI"){
   for(i in breaker:nrow(testing_ready_pred)){
     for(j in NPInames){
