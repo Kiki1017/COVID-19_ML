@@ -525,7 +525,7 @@ str(testing_ready)
 
 # Create a Random Forest model with default parameters
 if(death_flag==F){
-  training_ready_sub2 <- subset(training_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered))
+  training_ready_sub2 <- subset(training_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered,confirmed_cum_per_million_lag_01,time))
   training_ready_sub2 <- training_ready_sub2[,grep("death|MalePercent|FemalePercent", colnames(training_ready_sub2),invert = T)]
   for(i in (nLags+1):100){
     training_ready_sub2 <- training_ready_sub2[,grep(paste0(sprintf("lag_%02d", i)), colnames(training_ready_sub2),invert = T)]
@@ -535,7 +535,7 @@ if(death_flag==F){
   training_ready_sub2 %<>% mutate_if(is.character,as.numeric)
   training_ready_sub2 %<>% mutate_if(is.integer,as.numeric)
   # remove more columns we don't want in the model
-  testing_ready_sub2 <- subset(testing_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered))
+  testing_ready_sub2 <- subset(testing_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered,confirmed_cum_per_million_lag_01,time))
   testing_ready_sub2 <- testing_ready_sub2[,grep("death|MalePercent|FemalePercent", colnames(testing_ready_sub2),invert = T)]
   for(i in (nLags+1):100){
     testing_ready_sub2 <- testing_ready_sub2[,grep(paste0(sprintf("lag_%02d", i)), colnames(testing_ready_sub2),invert = T)]
@@ -575,7 +575,7 @@ if(death_flag==F){
     }
   }
 }else if(death_flag==T){
-  training_ready_sub2 <- subset(training_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recoveredd))
+  training_ready_sub2 <- subset(training_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered,confirmed_cum_per_million_lag_01,time))
   training_ready_sub2 <- training_ready_sub2[,grep("confirmed|MalePercent|FemalePercent", colnames(training_ready_sub2),invert = T)]
   for(i in (nLags+1):100){
     training_ready_sub2 <- training_ready_sub2[,grep(paste0(sprintf("lag_%02d", i)), colnames(training_ready_sub2),invert = T)]
@@ -585,7 +585,7 @@ if(death_flag==F){
   training_ready_sub2 %<>% mutate_if(is.character,as.numeric)
   training_ready_sub2 %<>% mutate_if(is.integer,as.numeric)
   # remove more columns we don't want in the model
-  testing_ready_sub2 <- subset(testing_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered))
+  testing_ready_sub2 <- subset(testing_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered,confirmed_cum_per_million_lag_01,time))
   testing_ready_sub2 <- testing_ready_sub2[,grep("confirmed|MalePercent|FemalePercent", colnames(testing_ready_sub2),invert = T)]
   for(i in (nLags+1):100){
     testing_ready_sub2 <- testing_ready_sub2[,grep(paste0(sprintf("lag_%02d", i)), colnames(testing_ready_sub2),invert = T)]
