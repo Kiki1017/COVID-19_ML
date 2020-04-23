@@ -118,7 +118,8 @@ print("These countries have data collected for non-pharmaceutical interventions:
 unique(data_npi$ISO3)
 
 
-## ---- Merging data sources and writing to a csv file
+#---Merging data sources and writing to a csv file---#########################################################################################################################################################################
+
 # Merge together time series data (COVID and NPI)
 data_ts <- left_join(data_COVID, data_npi, by = c('date', 'ISO3'))
 
@@ -129,82 +130,111 @@ sapply(data_features, function(x) sum(is.na(x)))
 
 summary(data_features)
 
-## ---- Add Google Movement Data
-GoogData <- read_excel("./InputData/Google_final_29_Mar.xlsx", sheet = "Google_final_29_Mar", col_names = T)
-for(i in 1:nrow(GoogData)){
-  if(is.na(GoogData$Country[i])){
-    GoogData$Country[i] <- GoogData$Country[i-1]
-  }
-}
-GoogData <- GoogData[!is.na(GoogData$Location),]
-GoogDataSpread <- GoogData %>% spread(key="Location", value="Percent_Change")
-GoogDataSpreadSeparate <- GoogDataSpread %>% separate(Country,into=c("Country","Fluff1"),convert=TRUE,sep=" March")
-GoogDataSpreadSeparate2 <- GoogDataSpreadSeparate %>% separate(Country,into=c("Country","Fluff2"),convert=TRUE,sep=" -")
-GoogDataSpreadSeparate2$Country <- as.character(GoogDataSpreadSeparate2$Country)
-data_features$Country.x <- as.character(data_features$Country.x)
-# fix any mismatching country names
-unique(data_featuresCountries[which(data_features$Country.x %ni% GoogDataSpreadSeparate2$Country)])
-GoogDataSpreadSeparate2$Country[GoogDataSpreadSeparate2$Country=="South Korea"] <- "Korea, South"
-GoogDataSpreadSeparate2$Country[GoogDataSpreadSeparate2$Country=="United States"] <- "US"
-unique(data_featuresCountries[which(data_features$Country.x %ni% GoogDataSpreadSeparate2$Country)])
-GoogDataSpreadSeparate2$Start_Date[GoogDataSpreadSeparate2$Start_Date=="Sun Feb 16"] <- "2020-02-16"
-GoogDataSpreadSeparate2 <- GoogDataSpreadSeparate2 %>%
-  mutate(Start_Date = ymd(Start_Date))
-GoogDataSpreadSeparate2$End_Date[GoogDataSpreadSeparate2$End_Date=="Sun Mar 29"] <- "2020-03-29"
-# GoogDataSpreadSeparate2$End_Date[GoogDataSpreadSeparate2$End_Date=="Sun Mar 29"] <- as.character(max(data_features$date))
-GoogDataSpreadSeparate2 <- GoogDataSpreadSeparate2 %>%
-  mutate(End_Date = ymd(End_Date))
-# initialize data_features with new variables
-data_features$Google_Grocery_pharmacy <- NA
-data_features$Google_Parks <- NA
-data_features$Google_Residential <- NA
-data_features$Google_Retail_recreation <- NA
-data_features$Google_Transit_stations <- NA
-data_features$Google_Workplaces <- NA
+#---Old way to Add Google Movement Data---#########################################################################################################################################################################
+# GoogData <- read_excel("./InputData/Google_final_29_Mar.xlsx", sheet = "Google_final_29_Mar", col_names = T)
+# for(i in 1:nrow(GoogData)){
+#   if(is.na(GoogData$Country[i])){
+#     GoogData$Country[i] <- GoogData$Country[i-1]
+#   }
+# }
+# GoogData <- GoogData[!is.na(GoogData$Location),]
+# GoogDataSpread <- GoogData %>% spread(key="Location", value="Percent_Change")
+# GoogDataSpreadSeparate <- GoogDataSpread %>% separate(Country,into=c("Country","Fluff1"),convert=TRUE,sep=" March")
+# GoogDataSpreadSeparate2 <- GoogDataSpreadSeparate %>% separate(Country,into=c("Country","Fluff2"),convert=TRUE,sep=" -")
+# GoogDataSpreadSeparate2$Country <- as.character(GoogDataSpreadSeparate2$Country)
+# data_features$Country.x <- as.character(data_features$Country.x)
+# # fix any mismatching country names
+# unique(data_featuresCountries[which(data_features$Country.x %ni% GoogDataSpreadSeparate2$Country)])
+# GoogDataSpreadSeparate2$Country[GoogDataSpreadSeparate2$Country=="South Korea"] <- "Korea, South"
+# GoogDataSpreadSeparate2$Country[GoogDataSpreadSeparate2$Country=="United States"] <- "US"
+# unique(data_featuresCountries[which(data_features$Country.x %ni% GoogDataSpreadSeparate2$Country)])
+# GoogDataSpreadSeparate2$Start_Date[GoogDataSpreadSeparate2$Start_Date=="Sun Feb 16"] <- "2020-02-16"
+# GoogDataSpreadSeparate2 <- GoogDataSpreadSeparate2 %>%
+#   mutate(Start_Date = ymd(Start_Date))
+# GoogDataSpreadSeparate2$End_Date[GoogDataSpreadSeparate2$End_Date=="Sun Mar 29"] <- "2020-03-29"
+# # GoogDataSpreadSeparate2$End_Date[GoogDataSpreadSeparate2$End_Date=="Sun Mar 29"] <- as.character(max(data_features$date))
+# GoogDataSpreadSeparate2 <- GoogDataSpreadSeparate2 %>%
+#   mutate(End_Date = ymd(End_Date))
+# # initialize data_features with new variables
+# for(i in 1:nrow(GoogDataSpreadSeparate2)){
+#   toReplace <- which(data_features$Country.x==GoogDataSpreadSeparate2$Country[i])
+#   if(length(toReplace)>0){
+#     # create linear progression between two time Start_Date and End_Date
+#     Grocery_pharmacy <- seq(from=1,to=1+as.numeric(GoogDataSpreadSeparate2$`Grocery & pharmacy`[i]),length.out=as.numeric(GoogDataSpreadSeparate2$End_Date[i] - GoogDataSpreadSeparate2$Start_Date[i])+1)
+#     Parks <- seq(from=1,to=1+as.numeric(GoogDataSpreadSeparate2$Parks[i]),length.out=as.numeric(GoogDataSpreadSeparate2$End_Date[i] - GoogDataSpreadSeparate2$Start_Date[i])+1)
+#     Residential <- seq(from=1,to=1+as.numeric(GoogDataSpreadSeparate2$Residential[i]),length.out=as.numeric(GoogDataSpreadSeparate2$End_Date[i] - GoogDataSpreadSeparate2$Start_Date[i])+1)
+#     Retail_recreation <- seq(from=1,to=1+as.numeric(GoogDataSpreadSeparate2$`Retail & recreation`[i]),length.out=as.numeric(GoogDataSpreadSeparate2$End_Date[i] - GoogDataSpreadSeparate2$Start_Date[i])+1)
+#     Transit_stations <- seq(from=1,to=1+as.numeric(GoogDataSpreadSeparate2$`Transit stations`[i]),length.out=as.numeric(GoogDataSpreadSeparate2$End_Date[i] - GoogDataSpreadSeparate2$Start_Date[i])+1)
+#     Workplaces <- seq(from=1,to=1+as.numeric(GoogDataSpreadSeparate2$Workplaces[i]),length.out=as.numeric(GoogDataSpreadSeparate2$End_Date[i] - GoogDataSpreadSeparate2$Start_Date[i])+1)
+#     # fill in the right parts of data_features with the new linear data
+#     beginDate <- which(data_features[toReplace,c("date")] == GoogDataSpreadSeparate2$Start_Date[i])
+#     stopDate <- which(data_features[toReplace,c("date")] == GoogDataSpreadSeparate2$End_Date[i])
+#     data_features[toReplace,c("Google_Grocery_pharmacy")][beginDate:stopDate] <- Grocery_pharmacy
+#     data_features[toReplace,c("Google_Parks")][beginDate:stopDate] <- Parks
+#     data_features[toReplace,c("Google_Residential")][beginDate:stopDate] <- Residential
+#     data_features[toReplace,c("Google_Retail_recreation")][beginDate:stopDate] <- Retail_recreation
+#     data_features[toReplace,c("Google_Transit_stations")][beginDate:stopDate] <- Transit_stations
+#     data_features[toReplace,c("Google_Workplaces")][beginDate:stopDate] <- Workplaces
+#     # if pre_autofill_Google signifies, we fill everything pre google data with 1s
+#     if(pre_autofill_Google == T){
+#       data_features[toReplace,c("Google_Grocery_pharmacy")][1:(beginDate-1)] <- 1
+#       data_features[toReplace,c("Google_Parks")][1:(beginDate-1)] <- 1
+#       data_features[toReplace,c("Google_Residential")][1:(beginDate-1)] <- 1
+#       data_features[toReplace,c("Google_Retail_recreation")][1:(beginDate-1)] <- 1
+#       data_features[toReplace,c("Google_Transit_stations")][1:(beginDate-1)] <- 1
+#       data_features[toReplace,c("Google_Workplaces")][1:(beginDate-1)] <- 1
+#     }
+#     # if post_autofill_Google signifies, we fill everything post google data with the last datapoint
+#     if(post_autofill_Google == T & (stopDate+1) <= length(toReplace) ){
+#       data_features[toReplace,c("Google_Grocery_pharmacy")][(stopDate+1):length(toReplace)] <- 1+as.numeric(GoogDataSpreadSeparate2$`Grocery & pharmacy`[i])
+#       data_features[toReplace,c("Google_Parks")][(stopDate+1):length(toReplace)] <- 1+as.numeric(GoogDataSpreadSeparate2$Parks[i])
+#       data_features[toReplace,c("Google_Residential")][(stopDate+1):length(toReplace)] <- 1+as.numeric(GoogDataSpreadSeparate2$Residential[i])
+#       data_features[toReplace,c("Google_Retail_recreation")][(stopDate+1):length(toReplace)] <- 1+as.numeric(GoogDataSpreadSeparate2$`Retail & recreation`[i])
+#       data_features[toReplace,c("Google_Transit_stations")][(stopDate+1):length(toReplace)] <- 1+as.numeric(GoogDataSpreadSeparate2$`Transit stations`[i])
+#       data_features[toReplace,c("Google_Workplaces")][(stopDate+1):length(toReplace)] <- 1+as.numeric(GoogDataSpreadSeparate2$Workplaces[i])
+#     }
+#   }
+# }
 
-for(i in 1:nrow(GoogDataSpreadSeparate2)){
-  toReplace <- which(data_features$Country.x==GoogDataSpreadSeparate2$Country[i])
-  if(length(toReplace)>0){
-    # create linear progression between two time Start_Date and End_Date
-    Grocery_pharmacy <- seq(from=1,to=1+as.numeric(GoogDataSpreadSeparate2$`Grocery & pharmacy`[i]),length.out=as.numeric(GoogDataSpreadSeparate2$End_Date[i] - GoogDataSpreadSeparate2$Start_Date[i])+1)
-    Parks <- seq(from=1,to=1+as.numeric(GoogDataSpreadSeparate2$Parks[i]),length.out=as.numeric(GoogDataSpreadSeparate2$End_Date[i] - GoogDataSpreadSeparate2$Start_Date[i])+1)
-    Residential <- seq(from=1,to=1+as.numeric(GoogDataSpreadSeparate2$Residential[i]),length.out=as.numeric(GoogDataSpreadSeparate2$End_Date[i] - GoogDataSpreadSeparate2$Start_Date[i])+1)
-    Retail_recreation <- seq(from=1,to=1+as.numeric(GoogDataSpreadSeparate2$`Retail & recreation`[i]),length.out=as.numeric(GoogDataSpreadSeparate2$End_Date[i] - GoogDataSpreadSeparate2$Start_Date[i])+1)
-    Transit_stations <- seq(from=1,to=1+as.numeric(GoogDataSpreadSeparate2$`Transit stations`[i]),length.out=as.numeric(GoogDataSpreadSeparate2$End_Date[i] - GoogDataSpreadSeparate2$Start_Date[i])+1)
-    Workplaces <- seq(from=1,to=1+as.numeric(GoogDataSpreadSeparate2$Workplaces[i]),length.out=as.numeric(GoogDataSpreadSeparate2$End_Date[i] - GoogDataSpreadSeparate2$Start_Date[i])+1)
-    # fill in the right parts of data_features with the new linear data
-    beginDate <- which(data_features[toReplace,c("date")] == GoogDataSpreadSeparate2$Start_Date[i])
-    stopDate <- which(data_features[toReplace,c("date")] == GoogDataSpreadSeparate2$End_Date[i])
-    data_features[toReplace,c("Google_Grocery_pharmacy")][beginDate:stopDate] <- Grocery_pharmacy
-    data_features[toReplace,c("Google_Parks")][beginDate:stopDate] <- Parks
-    data_features[toReplace,c("Google_Residential")][beginDate:stopDate] <- Residential
-    data_features[toReplace,c("Google_Retail_recreation")][beginDate:stopDate] <- Retail_recreation
-    data_features[toReplace,c("Google_Transit_stations")][beginDate:stopDate] <- Transit_stations
-    data_features[toReplace,c("Google_Workplaces")][beginDate:stopDate] <- Workplaces
-    # if pre_autofill_Google signifies, we fill everything pre google data with 1s
-    if(pre_autofill_Google == T){
-      data_features[toReplace,c("Google_Grocery_pharmacy")][1:(beginDate-1)] <- 1
-      data_features[toReplace,c("Google_Parks")][1:(beginDate-1)] <- 1
-      data_features[toReplace,c("Google_Residential")][1:(beginDate-1)] <- 1
-      data_features[toReplace,c("Google_Retail_recreation")][1:(beginDate-1)] <- 1
-      data_features[toReplace,c("Google_Transit_stations")][1:(beginDate-1)] <- 1
-      data_features[toReplace,c("Google_Workplaces")][1:(beginDate-1)] <- 1
-    }
-    # if post_autofill_Google signifies, we fill everything post google data with the last datapoint
-    if(post_autofill_Google == T & (stopDate+1) <= length(toReplace) ){
-      data_features[toReplace,c("Google_Grocery_pharmacy")][(stopDate+1):length(toReplace)] <- 1+as.numeric(GoogDataSpreadSeparate2$`Grocery & pharmacy`[i])
-      data_features[toReplace,c("Google_Parks")][(stopDate+1):length(toReplace)] <- 1+as.numeric(GoogDataSpreadSeparate2$Parks[i])
-      data_features[toReplace,c("Google_Residential")][(stopDate+1):length(toReplace)] <- 1+as.numeric(GoogDataSpreadSeparate2$Residential[i])
-      data_features[toReplace,c("Google_Retail_recreation")][(stopDate+1):length(toReplace)] <- 1+as.numeric(GoogDataSpreadSeparate2$`Retail & recreation`[i])
-      data_features[toReplace,c("Google_Transit_stations")][(stopDate+1):length(toReplace)] <- 1+as.numeric(GoogDataSpreadSeparate2$`Transit stations`[i])
-      data_features[toReplace,c("Google_Workplaces")][(stopDate+1):length(toReplace)] <- 1+as.numeric(GoogDataSpreadSeparate2$Workplaces[i])
-    }
-  }
-}
+#---New way to Add Google Movement Data---#########################################################################################################################################################################
+'%ni%' <- Negate('%in%')
+download.file("https://www.gstatic.com/covid19/mobility/Global_Mobility_Report.csv","./InputData/Global_Mobility_Report.csv")
+GoogData <- read.csv("./InputData/Global_Mobility_Report.csv", header=T)
+# Get just the overall country mobility stats
+GoogData_sub <- subset(GoogData, sub_region_1 == "" & sub_region_2 == "")
+GoogData_sub$country_region <- as.character(GoogData_sub$country_region)
+unique(data_features$Country.x[which(data_features$Country.x %ni% GoogData_sub$country_region)])
+GoogData_sub$country_region[GoogData_sub$country_region=="United States"] <- "US"
+GoogData_sub$country_region[GoogData_sub$country_region=="South Korea"] <- "Korea, South"
+unique(data_features$Country.x[which(data_features$Country.x %ni% GoogData_sub$country_region)])
 
-View(data_features[c("Country.x","date","Google_Grocery_pharmacy","Google_Parks","Google_Residential","Google_Retail_recreation","Google_Transit_stations","Google_Workplaces")])
+names(GoogData_sub)
+GoogData_sub2 <- GoogData_sub[,c("country_region","date","retail_and_recreation_percent_change_from_baseline",
+                                 "grocery_and_pharmacy_percent_change_from_baseline", 
+                                 "parks_percent_change_from_baseline", 
+                                 "transit_stations_percent_change_from_baseline",
+                                 "workplaces_percent_change_from_baseline",
+                                 "residential_percent_change_from_baseline")]
+colnames(GoogData_sub2) <- c("country_region","date","Google_Retail_recreation",
+                             "Google_Grocery_pharmacy",
+                             "Google_Parks",
+                             "Google_Transit_stations",
+                             "Google_Workplaces",
+                             "Google_Residential")
+data_features2 <- data_features
 
-write.csv(data_features, "./InputData/ML_features.csv", row.names = F)
+# Merge the two dataframes by country name and date
+GoogData_sub2$date <- as.character(GoogData_sub2$date)
+data_features2$date <- as.character(data_features2$date)
+GoogData_sub2$country_region <- as.character(GoogData_sub2$country_region)
+data_features2$Country.x <- as.character(data_features2$Country.x)
+GoogData_sub2 <- as_tibble(GoogData_sub2)
+data_features2 <- as_tibble(data_features2)
+data_features3 <- left_join(data_features2, GoogData_sub2, by = c("date" = "date", "Country.x" = "country_region"))
+
+# View(data_features3[c("Country.x","date","Google_Grocery_pharmacy","Google_Parks","Google_Residential","Google_Retail_recreation","Google_Transit_stations","Google_Workplaces")])
+
+write.csv(data_features3, "./InputData/ML_features.csv", row.names = F)
 
 
 

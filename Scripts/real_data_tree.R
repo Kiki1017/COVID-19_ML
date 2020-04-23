@@ -24,7 +24,11 @@ library(gbm)
 library(lattice)
 library(zoo)
 library(EpiEstim)
+library(viridis)
+library(RColorBrewer)
+library(ggCyberPunk)
 # library(earth)
+'%ni%' <- Negate('%in%')
 
 #---randomForestFunction---#########################################################################################################################################################################
 
@@ -77,7 +81,7 @@ caretFunction <- function(name="confirmed_cum_per_million",dd=training_ready_sub
                             n.minobsinnode = c(20))
     # nrow(gbmGrid)
     gbm.mod <- train(mod_formula,
-                     data = training_ready_sub2, 
+                     data = dd_fun, 
                      method = "gbm", 
                      trControl = fitControl, 
                      verbose = FALSE, 
@@ -93,7 +97,7 @@ caretFunction <- function(name="confirmed_cum_per_million",dd=training_ready_sub
     print("Training bayesglm.mod...")
     # Train a multivariatee adaptive regression spline with a poison
     bayesglm.mod <- train(mod_formula,
-                            data = training_ready_sub2,
+                            data = dd_fun,
                             method = "bayesglm",
                             trControl = fitControl,
                             na.action = nasaction)
@@ -104,7 +108,7 @@ caretFunction <- function(name="confirmed_cum_per_million",dd=training_ready_sub
     gam_flag=T
     print("Training gam.mod...")
     gam.mod <- train(mod_formula,
-                     data = training_ready_sub2,
+                     data = dd_fun,
                      method = "gam",
                      trControl = fitControl,
                      tuneLength=tuneLength.num,
@@ -116,7 +120,7 @@ caretFunction <- function(name="confirmed_cum_per_million",dd=training_ready_sub
     glm_flag=T
     print("Training glm.mod ...")
     glm.mod <- train(mod_formula,
-                       data = training_ready_sub2,
+                       data = dd_fun,
                        method = "glm",
                        trControl = fitControl,
                        tuneLength=tuneLength.num,
@@ -128,7 +132,7 @@ caretFunction <- function(name="confirmed_cum_per_million",dd=training_ready_sub
     rf_flag=T
     print("Training rf.mod ...")
     rf.mod <- train(mod_formula,
-                    data = training_ready_sub2,
+                    data = dd_fun,
                     method = "rf",
                     trControl = fitControl,
                     tuneLength=tuneLength.num,
@@ -175,27 +179,27 @@ predictFunction <- function(name=best_model, mod_name=model_name, dd=testing_rea
   # enable parallel processing
   # predict_df <- eval(parse(text=paste(dd)))
   if("gbm.mod" == mod_name){
-    dd %<>% mutate_if(is.factor,as.character)  
-    dd %<>% mutate_if(is.character,as.numeric)
-    predict_tmp1 <- predict.gbm(name, dd, na.action = nasaction, n.trees = n_trees)
+    # dd[,which(names(dd) %ni% c("lag_01_cut"))] %<>% mutate_if(is.factor,as.character)  
+    # dd[,which(names(dd) %ni% c("lag_01_cut"))] %<>% mutate_if(is.character,as.numeric)
+    # predict_tmp1 <- predict.gbm(name, dd, na.action = nasaction, n.trees = n_trees)
     predict_tmp <- rowMeans(predict_tmp1)
   }else if("bayesglm.mod" == mod_name){
-    dd %<>% mutate_if(is.factor,as.character)  
-    dd %<>% mutate_if(is.character,as.numeric)
-    dd %<>% mutate_if(is.integer,as.numeric)
+    # dd[,which(names(dd) %ni% c("lag_01_cut"))] %<>% mutate_if(is.factor,as.character)  
+    # dd[,which(names(dd) %ni% c("lag_01_cut"))] %<>% mutate_if(is.character,as.numeric)
+    # dd[,which(names(dd) %ni% c("lag_01_cut"))] %<>% mutate_if(is.integer,as.numeric)
     predict_tmp <- predict(name, dd, na.action = nasaction, n.trees = n_trees)
   }else if("gam.mod" == mod_name){
-    dd %<>% mutate_if(is.factor,as.character)  
-    dd %<>% mutate_if(is.character,as.numeric)
+    # dd[,which(names(dd) %ni% c("lag_01_cut"))] %<>% mutate_if(is.factor,as.character)  
+    # dd[,which(names(dd) %ni% c("lag_01_cut"))] %<>% mutate_if(is.character,as.numeric)
     predict_tmp <- predict.gam(name, dd, na.action = nasaction)
   }else if("glm.mod" == mod_name){
-    dd %<>% mutate_if(is.factor,as.character)  
-    dd %<>% mutate_if(is.character,as.numeric)
-    dd %<>% mutate_if(is.integer,as.numeric)
+    # dd[,which(names(dd) %ni% c("lag_01_cut"))] %<>% mutate_if(is.factor,as.character)  
+    # dd[,which(names(dd) %ni% c("lag_01_cut"))] %<>% mutate_if(is.character,as.numeric)
+    # dd[,which(names(dd) %ni% c("lag_01_cut"))] %<>% mutate_if(is.integer,as.numeric)
     predict_tmp <- predict(name, dd, na.action = nasaction, n.trees = n_trees)
   }else if("rf.mod" == mod_name){
-    dd %<>% mutate_if(is.factor,as.character)  
-    dd %<>% mutate_if(is.character,as.numeric)
+    # dd[,which(names(dd) %ni% c("lag_01_cut"))] %<>% mutate_if(is.factor,as.character)  
+    # dd[,which(names(dd) %ni% c("lag_01_cut"))] %<>% mutate_if(is.character,as.numeric)
     predict_tmp <- predict(name, dd, na.action = nasaction)
   }
   return(predict_tmp)
@@ -230,6 +234,12 @@ nLags <- 1
 projectionTime <- 14
 NPIflag1 <- "autofill"
 NPIflag2 <- "lastNPI"
+# The Percent of the timeframe you want to reserve for testing a country (the rest of that country's time series is included into the model)
+testingTimeFrame <- 0.5
+# Columns you don't want to be in the model
+# listToRemove <- c("date","Country.x","Country.y","ISO3","confirmed","death","Source","FullName","recovered","confirmed_cum_per_million_lag_01")
+listToRemove <- c("date","Country.x","Country.y","ISO3","confirmed","death","Source","FullName","recovered","lag_01_cut")
+# listToRemove <- c("date","Country.x","Country.y","ISO3","confirmed","death","Source","FullName","recovered")
 
 #---dataSetup---#########################################################################################################################################################################
 data_clean <- read.csv("./InputData/ML_features.csv")
@@ -244,13 +254,15 @@ testing_countries <- c("USA")
 # testing_countries <- c("BRA")
 # testing_countries <- c("ESP")
 # testing_countries <- c("GBR")
+# testing_countries <- c("BEL")
 
 # make country lists, these are the ones that we have NPI data collected for
 # https://docs.google.com/spreadsheets/d/1vrKvs52OAxuB7x2kT9r1q6IcIBxGEQsNRHsK_o7h3jo/edit#gid=378237553
-# training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","HUB","KOR","USA","SWE","AUT","CHE","DEU","FRA")
-# training_countries_all <- c("ITA","FRA")
-training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","HUB","KOR","USA","SWE","AUT","CHE","DEU","FRA","DZA","IRN","CAN","TUR","BEL","ANT","PRT","ISR","RUS","NOR","IRL","AUS","IND","DNK","CHL","CZE","JPN","UKR","MAR","ARG","SGP","ROU")
+# training_countries_all <- c("ITA","FRA","GBR")
 # training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","USA","SWE","AUT","CHE","DEU","FRA")
+training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","HUB","KOR","USA","SWE","AUT","CHE","DEU","FRA","DZA","IRN","CAN","TUR","BEL","ANT","PRT","ISR","RUS","NOR","IRL","AUS","IND","DNK","CHL","CZE","JPN","UKR","MAR","ARG","SGP","ROU")
+# training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","KOR","USA","SWE","AUT","CHE","DEU","FRA","DZA","IRN","CAN","TUR","BEL","ANT","PRT","ISR","RUS","NOR","IRL","AUS","IND","DNK","CHL","CZE","JPN","UKR","MAR","ARG","SGP","ROU")
+
 training_countries <- training_countries_all[which(training_countries_all != testing_countries)]
 
 #---Estimating reproduction numbers, R0---#########################################################################################################################################################################
@@ -298,8 +310,6 @@ SItable1 = serialIntervals %>% mutate(
   `Population`=population
 )
 
-#### Calculate the mean serial intervals ----
-
 wtSIs = serialIntervals %>% summarise(
   mean_si = weighted.mean(mean_si_estimate,sample_size,na.rm = TRUE),
   min_mean_si = weighted.mean(mean_si_estimate_low_ci,sample_size,na.rm = TRUE),
@@ -313,7 +323,6 @@ wtSIs = serialIntervals %>% summarise(
   std_std_si = (max_std_si - min_std_si) / 3.92
 )
 
-#### Construct a R_t timeseries for Regional breakdowns ----
 config = make_config(list(si_parametric_distr = "G",
                           mean_si = wtSIs$mean_si, 
                           std_mean_si = wtSIs$std_mean_si,
@@ -327,6 +336,7 @@ config = make_config(list(si_parametric_distr = "G",
 
 #---trainingTestingDataFrames---#########################################################################################################################################################################
 # create training dataframe
+pdf("R0_plot.pdf",width = 11,height = 8.5)
 for(i in 1:length(training_countries)){
   training_subset <- subset(data_clean,ISO3 %in% training_countries[i])
   if(incidence_flag==T & death_flag == F){
@@ -353,9 +363,22 @@ for(i in 1:length(training_countries)){
   training_subset_aligned$R0 <- NA 
   training_subset_aligned$R0[head(res_uncertain_si[["R"]]$`t_start`,1):tail(res_uncertain_si[["R"]]$`t_start`,1)] <- res_uncertain_si[["R"]]$`Mean(R)`
   # Autofill beginning R0s with first value
-  training_subset_aligned$R0[1:head(res_uncertain_si[["R"]]$`t_start`,1)] <- head(res_uncertain_si[["R"]]$`Mean(R)`,1)
+  training_subset_aligned$R0[1:head(res_uncertain_si[["R"]]$`t_start`,1)] <- mean(head(res_uncertain_si[["R"]]$`Mean(R)`,5))
   # Autofill ending R0s with last value
-  training_subset_aligned$R0[tail(res_uncertain_si[["R"]]$`t_start`,1):nrow(training_subset_aligned)] <- tail(res_uncertain_si[["R"]]$`Mean(R)`,1)
+  training_subset_aligned$R0[tail(res_uncertain_si[["R"]]$`t_start`,1):nrow(training_subset_aligned)] <- mean(tail(res_uncertain_si[["R"]]$`Mean(R)`,5))
+  listToLag <- c("R0","Google_Retail_recreation","Google_Grocery_pharmacy","Google_Parks","Google_Transit_stations","Google_Workplaces","Google_Residential")
+  for(npi in 1:length(listToLag)){
+    # Add 3 day lag factor for R0
+    training_subset_aligned[[paste0(listToLag[npi],"_Lag_3")]] <- lag(training_subset_aligned[[paste0(listToLag[npi])]],3)
+    training_subset_aligned[[paste0(listToLag[npi],"_Lag_3")]][1:3] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:5])
+    # Add 7 day lag factor for R0
+    training_subset_aligned[[paste0(listToLag[npi],"_Lag_7")]] <- lag(training_subset_aligned[[paste0(listToLag[npi])]],7)
+    training_subset_aligned[[paste0(listToLag[npi],"_Lag_7")]][1:7] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:5])
+    # Add 14 day lag factor for R0
+    training_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]] <- lag(training_subset_aligned[[paste0(listToLag[npi])]],14)
+    training_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]][1:14] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:5])
+  }
+
   plot.new()
   plot(res_uncertain_si, legend = T)
   mtext(training_countries[i], outer=TRUE,  cex=1, line=-.5)
@@ -391,9 +414,21 @@ for(i in 1:length(testing_countries)){
   testing_subset_aligned$R0 <- NA 
   testing_subset_aligned$R0[head(res_uncertain_si[["R"]]$`t_start`,1):tail(res_uncertain_si[["R"]]$`t_start`,1)] <- res_uncertain_si[["R"]]$`Mean(R)`
   # Autofill beginning R0s with first value
-  testing_subset_aligned$R0[1:head(res_uncertain_si[["R"]]$`t_start`,1)] <- head(res_uncertain_si[["R"]]$`Mean(R)`,1)
+  testing_subset_aligned$R0[1:head(res_uncertain_si[["R"]]$`t_start`,1)] <- mean(head(res_uncertain_si[["R"]]$`Mean(R)`,5))
   # Autofill ending R0s with last value
-  testing_subset_aligned$R0[tail(res_uncertain_si[["R"]]$`t_start`,1):nrow(testing_subset_aligned)] <- tail(res_uncertain_si[["R"]]$`Mean(R)`,1)
+  testing_subset_aligned$R0[tail(res_uncertain_si[["R"]]$`t_start`,1):nrow(testing_subset_aligned)] <- mean(tail(res_uncertain_si[["R"]]$`Mean(R)`,5))
+  listToLag <- c("R0","Google_Retail_recreation","Google_Grocery_pharmacy","Google_Parks","Google_Transit_stations","Google_Workplaces","Google_Residential")
+  for(npi in 1:length(listToLag)){
+    # Add 3 day lag factor for R0
+    testing_subset_aligned[[paste0(listToLag[npi],"_Lag_3")]] <- lag(testing_subset_aligned[[paste0(listToLag[npi])]],3)
+    testing_subset_aligned[[paste0(listToLag[npi],"_Lag_3")]][1:3] <- testing_subset_aligned[[paste0(listToLag[npi])]][1]
+    # Add 7 day lag factor for R0
+    testing_subset_aligned[[paste0(listToLag[npi],"_Lag_7")]] <- lag(testing_subset_aligned[[paste0(listToLag[npi])]],7)
+    testing_subset_aligned[[paste0(listToLag[npi],"_Lag_7")]][1:7] <- testing_subset_aligned[[paste0(listToLag[npi])]][1]
+    # Add 14 day lag factor for R0
+    testing_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]] <- lag(testing_subset_aligned[[paste0(listToLag[npi])]],14)
+    testing_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]][1:14] <- testing_subset_aligned[[paste0(listToLag[npi])]][1]
+  }
   plot.new()
   plot(res_uncertain_si, legend = T)
   mtext(training_countries[i], outer=TRUE,  cex=1, line=-.5)
@@ -412,6 +447,58 @@ for(i in 1:length(testing_countries)){
     testing_ready <- as.data.frame(rbind(testing_ready,testing_subset_aligned_predictNA))
   }
 }
+dev.off()
+
+testing_ready_OG <- testing_ready
+training_ready_OG <- training_ready
+# Let's use some of the country's data for training
+NrowToSaveForTesting <- round(nrow(testing_ready_OG)*testingTimeFrame)
+breakpoint <- nrow(testing_ready_OG)-NrowToSaveForTesting
+testing_ready <- testing_ready_OG[(breakpoint+1):nrow(testing_ready_OG),]
+training_ready <- as.data.frame(rbind(training_ready_OG,training_ready_OG[1:breakpoint,]))
+
+
+if(incidence_flag==T && death_flag==F){
+  # geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1) +
+  h <- hist(training_ready$confirmed_cum_per_million_lag_01,breaks = 100)
+  # myBreaks <- quantile(training_ready$confirmed_cum_per_million_lag_01,seq(0, 1, by= 0.1))
+  myBreaks <- h$breaks
+  training_ready$lag_01_cut <- as.numeric(cut(training_ready$confirmed_cum_per_million_lag_01, breaks = myBreaks,
+                                   include.lowest = T, right = TRUE, dig.lab = 3,
+                                   ordered_result = T))
+  testing_ready$lag_01_cut <- as.numeric(cut(testing_ready$confirmed_cum_per_million_lag_01, breaks = myBreaks,
+                                  include.lowest = T, right = TRUE, dig.lab = 3,
+                                  ordered_result = T))
+}else if(incidence_flag==T && death_flag==T){
+  #   # geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1)+
+  myBreaks <- quantile(training_ready$death_cum_per_million_lag_01,seq(0, 1, by= 0.03))
+  training_ready$lag_01_cut <- as.numeric(cut(training_ready$death_cum_per_million_lag_01, breaks = myBreaks,
+                                   include.lowest = T, right = TRUE, dig.lab = 3,
+                                   ordered_result = T))
+  testing_ready$lag_01_cut <- as.numeric(cut(testing_ready$death_cum_per_million_lag_01, breaks = myBreaks,
+                                  include.lowest = T, right = TRUE, dig.lab = 3,
+                                  ordered_result = T))
+}else if(incidence_flag==F && death_flag==F){
+  #   geom_line(data=training_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size=0.8,alpha=.7)+
+  myBreaks <- quantile(training_ready$confirmed_cum_lag_01,seq(0, 1, by= 0.03))
+  training_ready$lag_01_cut <- as.numeric(cut(training_ready$confirmed_cum_lag_01, breaks = myBreaks,
+                                   include.lowest = T, right = TRUE, dig.lab = 3,
+                                   ordered_result = T))
+  testing_ready$lag_01_cut <- as.numeric(cut(testing_ready$confirmed_cum_lag_01, breaks = myBreaks,
+                                  include.lowest = T, right = TRUE, dig.lab = 3,
+                                  ordered_result = T))
+}else if(incidence_flag==F && death_flag==T){
+  #   geom_line(data=training_ready, aes(x = time, y = death_cum, group = FullName, color = FullName), size=0.8,alpha=.7)+
+  myBreaks <- quantile(training_ready$death_cum_lag_01,seq(0, 1, by= 0.03))
+  training_ready$lag_01_cut <- as.numeric(cut(training_ready$death_cum_lag_01, breaks = myBreaks,
+                                   include.lowest = T, right = TRUE, dig.lab = 3,
+                                   ordered_result = T))
+  testing_ready$lag_01_cut <- as.numeric(cut(testing_ready$death_cum_lag_01, breaks = myBreaks,
+                                  include.lowest = T, right = TRUE, dig.lab = 3,
+                                  ordered_result = T))
+}
+
+
 
 #---NPIflag1---#########################################################################################################################################################################
 # Here we write a little loop that takes care of the fact that the Johns hopkins count data is 
@@ -447,23 +534,23 @@ peek_at_NPIs_training2 <- training_ready[,c(c("date","time","Country.x","ISO3","
 
 peek_at_NPIs_testing1 <- testing_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(testing_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(testing_ready))])]
 NPInames <- names(testing_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(testing_ready))]
-counter <- 1
-prevcountry <- testing_ready$Country.x[1]
+# counter <- 1
+# prevcountry <- testing_ready$Country.x[1]
 if(NPIflag1 == "autofill"){
   for(i in 2:nrow(testing_ready)){
-    curcountry <- testing_ready$Country.x[i]
-    if(curcountry == prevcountry){
-      counter <- counter+1
-    }else{
-      counter <- 1
-    }
+    # curcountry <- testing_ready$Country.x[i]
+    # if(curcountry == prevcountry){
+    #   counter <- counter+1
+    # }else{
+    #   counter <- 1
+    # }
     
     for(j in NPInames){
-      if(is.na(testing_ready[[j]][i]) && counter > 14){
+      if(is.na(testing_ready[[j]][i])){
         testing_ready[[j]][i] <- testing_ready[[j]][i-1]
       }
     }
-    prevcountry <- curcountry
+    # prevcountry <- curcountry
   }
 }
 peek_at_NPIs_testing2 <- testing_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(testing_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(testing_ready))])]
@@ -471,39 +558,67 @@ peek_at_NPIs_testing2 <- testing_ready[,c(c("date","time","Country.x","ISO3","co
 
 #---first plot---#########################################################################################################################################################################
 # lineColors <- c("firebrick","darkgoldenrod1", "darkviolet", "limegreen", "dodgerblue")
+colorList <- c(randomColor(length(training_countries)+1))
+alphabeticalList <- sort(c(unique(as.character(testing_ready_OG$FullName)),unique(as.character(training_ready$FullName))))
+alphabeticalIndex <- which(alphabeticalList == unique(as.character(testing_ready_OG$FullName)))
+colorList[alphabeticalIndex] <- "red"
+
 plot1 <- ggplot() 
 if(incidence_flag==T && death_flag==F){
-  plot1 <- plot1 +
-    geom_line(data=training_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size=0.8,alpha=.7)+
     # geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1) +
-    geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size = 3, colour = 'red', alpha = 0.1) +
-    geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size = 2, colour = 'red', alpha = 0.2) +
-    geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size = 1, colour = 'red', alpha = 0.5) +
+    # geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size = 3, colour = 'red', alpha = 0.1) +
+    # geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size = 2, colour = 'red', alpha = 0.2) +
+    # geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size = 1, colour = 'red', alpha = 0.5) +
+    # geom_glowing_line(aes(x = testing_ready$time[1:(nrow(testing_ready)-projectionTime)], y = testing_ready$confirmed_cum_per_million[1:(nrow(testing_ready)-projectionTime)], color = FullName), alpha = 1, size = 1, glow_alpha = 0.03)+
+    # geom_glowing_line(aes(x = training_ready$time, y = training_ready$confirmed_cum_per_million, color = FullName, fill = FullName), alpha = 1, size = 1, glow_alpha = 0.03)+
+  plot1 <- testing_ready_OG %>%
+    ggplot(aes(x = time, y = confirmed_cum_per_million, color = FullName))+
+    geom_glowing_line()+
     labs(x=paste0("Days Since ",incidence_start_point," Cumulative Counts per Million"), y = "Confirmed Cumulative Cases per Million", title="")
+  plot1 <- plot1 +
+    geom_line(data=training_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size=0.8,alpha=.7)
 }else if(incidence_flag==T && death_flag==T){
-  plot1 <- plot1 +
-    geom_line(data=training_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size=0.8,alpha=.7)+
-    # geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1)+
-    geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size = 3, colour = 'red', alpha = 0.1) +
-    geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size = 2, colour = 'red', alpha = 0.2) +
-    geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size = 1, colour = 'red', alpha = 0.5) +
+  # plot1 <- plot1 +
+  #   geom_line(data=training_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size=0.8,alpha=.7)+
+  #   # geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1)+
+  #   geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size = 3, colour = 'red', alpha = 0.1) +
+  #   geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size = 2, colour = 'red', alpha = 0.2) +
+  #   geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size = 1, colour = 'red', alpha = 0.5) +
+  #   labs(x=paste0("Days Since ",incidence_start_point," Cumulative Deaths per Million"), y = "Confirmed Cumulative Deaths per Million", title="")
+  plot1 <- testing_ready_OG %>%
+    ggplot(aes(x = time, y = death_cum_per_million, color = FullName))+
+    geom_glowing_line()+
     labs(x=paste0("Days Since ",incidence_start_point," Cumulative Deaths per Million"), y = "Confirmed Cumulative Deaths per Million", title="")
+  plot1 <- plot1 +
+    geom_line(data=training_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size=0.8,alpha=.7)
 }else if(incidence_flag==F && death_flag==F){
-  plot1 <- plot1 +
-    geom_line(data=training_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size=0.8,alpha=.7)+
-    # geom_line(data=testing_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1)+
-    geom_line(data=testing_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size = 3, colour = 'red', alpha = 0.1) +
-    geom_line(data=testing_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size = 2, colour = 'red', alpha = 0.2) +
-    geom_line(data=testing_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size = 1, colour = 'red', alpha = 0.5) +
+  # plot1 <- plot1 +
+  #   geom_line(data=training_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size=0.8,alpha=.7)+
+  #   # geom_line(data=testing_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1)+
+  #   geom_line(data=testing_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size = 3, colour = 'red', alpha = 0.1) +
+  #   geom_line(data=testing_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size = 2, colour = 'red', alpha = 0.2) +
+  #   geom_line(data=testing_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size = 1, colour = 'red', alpha = 0.5) +
+  #   labs(x=paste0("Days Since ",count_start_point," Cumulative Counts"), y = "Confirmed Cumulative Cases", title="")
+  plot1 <- testing_ready_OG %>%
+    ggplot(aes(x = time, y = confirmed_cum, color = FullName))+
+    geom_glowing_line()+
     labs(x=paste0("Days Since ",count_start_point," Cumulative Counts"), y = "Confirmed Cumulative Cases", title="")
-}else if(incidence_flag==F && death_flag==T){
   plot1 <- plot1 +
-    geom_line(data=training_ready, aes(x = time, y = death_cum, group = FullName, color = FullName), size=0.8,alpha=.7)+
-    # geom_line(data=testing_ready, aes(x = time, y = death_cum, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1)+
-    geom_line(data=testing_ready, aes(x = time, y = death_cum, group = FullName, color = FullName), size = 3, colour = 'red', alpha = 0.1) +
-    geom_line(data=testing_ready, aes(x = time, y = death_cum, group = FullName, color = FullName), size = 2, colour = 'red', alpha = 0.2) +
-    geom_line(data=testing_ready, aes(x = time, y = death_cum, group = FullName, color = FullName), size = 1, colour = 'red', alpha = 0.5) +
+    geom_line(data=training_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size=0.8,alpha=.7)
+}else if(incidence_flag==F && death_flag==T){
+  # plot1 <- plot1 +
+  #   geom_line(data=training_ready, aes(x = time, y = death_cum, group = FullName, color = FullName), size=0.8,alpha=.7)+
+  #   # geom_line(data=testing_ready, aes(x = time, y = death_cum, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1)+
+  #   geom_line(data=testing_ready, aes(x = time, y = death_cum, group = FullName, color = FullName), size = 3, colour = 'red', alpha = 0.1) +
+  #   geom_line(data=testing_ready, aes(x = time, y = death_cum, group = FullName, color = FullName), size = 2, colour = 'red', alpha = 0.2) +
+  #   geom_line(data=testing_ready, aes(x = time, y = death_cum, group = FullName, color = FullName), size = 1, colour = 'red', alpha = 0.5) +
+  #   labs(x=paste0("Days Since ",count_start_point," Cumulative Deaths"), y = "Confirmed Cumulative Deaths", title="")
+  plot1 <- testing_ready_OG %>%
+    ggplot(aes(x = time, y = death_cum, color = FullName))+
+    geom_glowing_line()+
     labs(x=paste0("Days Since ",count_start_point," Cumulative Deaths"), y = "Confirmed Cumulative Deaths", title="")
+  plot1 <- plot1 +
+    geom_line(data=training_ready, aes(x = time, y = death_cum, group = FullName, color = FullName), size=0.8,alpha=.7)
 }
 plot1 <- plot1 +
   guides(color=guide_legend(title="")) +
@@ -514,18 +629,165 @@ plot1 <- plot1 +
         axis.title.y = element_text(color="black",size = 13, angle = 90)
   )+
   # scale_x_continuous(breaks=seq(1, 10, 1))+
-  scale_colour_manual(values=randomColor(length(training_countries)), aesthetics = "colour") +
+  scale_colour_manual(values=colorList, aesthetics = "colour") +
   theme(legend.text=element_text(size=9))+
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
         panel.background = element_blank(), axis.line = element_line(colour = "black"))
+# plot1
 
-#---tree_Models---#########################################################################################################################################################################
+#---second plot---#########################################################################################################################################################################
+# lineColors <- c("firebrick","darkgoldenrod1", "darkviolet", "limegreen", "dodgerblue")
+plot2 <- ggplot() 
+if(incidence_flag==T && death_flag==F){
+  # geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1) +
+  # geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size = 3, colour = 'red', alpha = 0.1) +
+  # geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size = 2, colour = 'red', alpha = 0.2) +
+  # geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size = 1, colour = 'red', alpha = 0.5) +
+  # geom_glowing_line(aes(x = testing_ready$time[1:(nrow(testing_ready)-projectionTime)], y = testing_ready$confirmed_cum_per_million[1:(nrow(testing_ready)-projectionTime)], color = FullName), alpha = 1, size = 1, glow_alpha = 0.03)+
+  # geom_glowing_line(aes(x = training_ready$time, y = training_ready$confirmed_cum_per_million, color = FullName, fill = FullName), alpha = 1, size = 1, glow_alpha = 0.03)+
+  plot2 <- testing_ready_OG %>%
+    ggplot(aes(x = time, y = R0, color = FullName))+
+    geom_glowing_line()+
+    labs(x=paste0("Days Since ",incidence_start_point," Cumulative Counts per Million"), y = "R0", title="")
+  plot2 <- plot2 +
+    geom_line(data=training_ready, aes(x = time, y = R0, group = FullName, color = FullName), size=0.8,alpha=.7)
+}else if(incidence_flag==T && death_flag==T){
+  # plot2 <- plot2 +
+  #   geom_line(data=training_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size=0.8,alpha=.7)+
+  #   # geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1)+
+  #   geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size = 3, colour = 'red', alpha = 0.1) +
+  #   geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size = 2, colour = 'red', alpha = 0.2) +
+  #   geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size = 1, colour = 'red', alpha = 0.5) +
+  #   labs(x=paste0("Days Since ",incidence_start_point," Cumulative Deaths per Million"), y = "Confirmed Cumulative Deaths per Million", title="")
+  plot2 <- testing_ready_OG %>%
+    ggplot(aes(x = time, y = R0, color = FullName))+
+    geom_glowing_line()+
+    labs(x=paste0("Days Since ",incidence_start_point," Cumulative Deaths per Million"), y = "R0", title="")
+  plot2 <- plot2 +
+    geom_line(data=training_ready, aes(x = time, y = R0, group = FullName, color = FullName), size=0.8,alpha=.7,show.legend = F)
+}else if(incidence_flag==F && death_flag==F){
+  # plot2 <- plot2 +
+  #   geom_line(data=training_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size=0.8,alpha=.7)+
+  #   # geom_line(data=testing_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1)+
+  #   geom_line(data=testing_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size = 3, colour = 'red', alpha = 0.1) +
+  #   geom_line(data=testing_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size = 2, colour = 'red', alpha = 0.2) +
+  #   geom_line(data=testing_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size = 1, colour = 'red', alpha = 0.5) +
+  #   labs(x=paste0("Days Since ",count_start_point," Cumulative Counts"), y = "Confirmed Cumulative Cases", title="")
+  plot2 <- testing_ready_OG %>%
+    ggplot(aes(x = time, y = R0, color = FullName))+
+    geom_glowing_line()+
+    labs(x=paste0("Days Since ",count_start_point," Cumulative Counts"), y = "R0", title="")
+  plot2 <- plot2 +
+    geom_line(data=training_ready, aes(x = time, y = R0, group = FullName, color = FullName), size=0.8,alpha=.7,show.legend = F)
+}else if(incidence_flag==F && death_flag==T){
+  # plot2 <- plot2 +
+  #   geom_line(data=training_ready, aes(x = time, y = death_cum, group = FullName, color = FullName), size=0.8,alpha=.7)+
+  #   # geom_line(data=testing_ready, aes(x = time, y = death_cum, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1)+
+  #   geom_line(data=testing_ready, aes(x = time, y = death_cum, group = FullName, color = FullName), size = 3, colour = 'red', alpha = 0.1) +
+  #   geom_line(data=testing_ready, aes(x = time, y = death_cum, group = FullName, color = FullName), size = 2, colour = 'red', alpha = 0.2) +
+  #   geom_line(data=testing_ready, aes(x = time, y = death_cum, group = FullName, color = FullName), size = 1, colour = 'red', alpha = 0.5) +
+  #   labs(x=paste0("Days Since ",count_start_point," Cumulative Deaths"), y = "Confirmed Cumulative Deaths", title="")
+  plot2 <- testing_ready_OG %>%
+    ggplot(aes(x = time, y = R0, color = FullName))+
+    geom_glowing_line()+
+    labs(x=paste0("Days Since ",count_start_point," Cumulative Deaths"), y = "R0", title="")
+  plot2 <- plot2 +
+    geom_line(data=training_ready, aes(x = time, y = R0, group = FullName, color = FullName), size=0.8,alpha=.7,show.legend = F)
+}
+plot2 <- plot2 +
+  ylim(c(0,7))+
+  guides(color=guide_legend(title="")) +
+  theme(legend.title=element_text(size=14))+
+  theme(axis.text.x = element_text(color="black",size = 13, angle = 0, hjust = .5, vjust = .5),
+        axis.text.y = element_text(color="black",size = 13, angle = 0),
+        axis.title.x = element_text(color="black",size = 13, angle = 0),
+        axis.title.y = element_text(color="black",size = 13, angle = 90)
+  )+
+  # scale_x_continuous(breaks=seq(1, 10, 1))+
+  scale_colour_manual(values=colorList, aesthetics = "colour") +
+  theme(legend.text=element_text(size=9))+
+  theme(legend.position = "none")+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))
+
+#---third and fourth plots---#########################################################################################################################################################################
+# lineColors <- c("firebrick","darkgoldenrod1", "darkviolet", "limegreen", "dodgerblue")
+plot34Data <- testing_ready_OG[1:(nrow(testing_ready_OG)-projectionTime),c("date","R0","Social_Distancing","Quaranting_Cases","Close_Border","Google_Grocery_pharmacy","Google_Parks","Google_Residential","Google_Retail_recreation","Google_Transit_stations","Google_Workplaces")]
+plot34Data <- plot34Data %>% gather(key,value,-date)
+# plot34Data$date <- as.date(plot34Data$date)
+plot34Data$key <- as.factor(plot34Data$key)
+plot34Data$value <- as.numeric(plot34Data$value)
+plot3Data <- subset(plot34Data, key %ni% c("R0","Social_Distancing","Quaranting_Cases","Close_Border"))
+plot4Data <- subset(plot34Data, key %in% c("R0","Social_Distancing","Quaranting_Cases","Close_Border"))
+
+plot3 <- ggplot() 
+plot3 <- plot3 +
+  # geom_line(data=training_ready, aes(x = time, y = R0, group = FullName, color = FullName), size=0.8,alpha=.7)+
+  # geom_line(data=subset(plot3Data, key %in% c("R0","Social_Distancing","Quaranting_Cases","Close_Border")), aes(x = date, y = value, group = key, color = key), size=1, linetype = "solid",alpha=1) +
+  geom_line(data=plot3Data, aes(x = date, y = value, group = key, color = key), size=1, linetype = "solid",alpha=1) +
+  # geom_line(data=testing_ready, aes(x = time, y = R0, group = FullName, color = FullName), size = 3, colour = 'red', alpha = 0.1) +
+  # geom_line(data=testing_ready, aes(x = time, y = R0, group = FullName, color = FullName), size = 2, colour = 'red', alpha = 0.2) +
+  # geom_line(data=testing_ready, aes(x = time, y = R0, group = FullName, color = FullName), size = 1, colour = 'red', alpha = 0.5) +
+  labs(x=paste0("Days Since ",incidence_start_point," Cumulative Counts per Million"), y = "% Change From Baseline", title="")
+plot3 <- plot3 +
+  guides(color=guide_legend(title="")) +
+  theme(legend.title=element_text(size=14))+
+  theme(axis.text.x = element_text(color="black",size = 13, angle = 0, hjust = .5, vjust = .5),
+        axis.text.y = element_text(color="black",size = 13, angle = 0),
+        axis.title.x = element_text(color="black",size = 13, angle = 0),
+        axis.title.y = element_text(color="black",size = 13, angle = 90)
+  )+
+  # scale_x_continuous(breaks=seq(1, 10, 1))+
+  # scale_colour_manual(values=randomColor(length(unique(plot3Data$key))), aesthetics = "colour") +
+  scale_colour_manual(values=brewer.pal(length(unique(plot3Data$key)), "Dark2"), aesthetics = "colour") +
+  theme(legend.text=element_text(size=9))+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))+
+  labs(x=NULL)
+
+# plot4Data <- subset(plot34Data, key %in% c("R0","Social_Distancing","Quaranting_Cases","Close_Border"))
+plot4Data$date <- as.Date(plot4Data$date)
+plot4Data$key <- factor(plot4Data$key, levels = c("Social_Distancing", "Quaranting_Cases", "Close_Border", "R0"), ordered = T)
+plot4 <- ggplot() 
+plot4_NPI <- subset(plot4Data, key %ni% c("R0"))
+plot4_NPI$key <- factor(plot4_NPI$key, levels = c("Social_Distancing", "Quaranting_Cases", "Close_Border", "R0"), ordered = T)
+plot4_R0 <- subset(plot4Data, key %in% c("R0"))
+plot4_R0$key <- factor(plot4_R0$key, levels = c("Social_Distancing", "Quaranting_Cases", "Close_Border", "R0"), ordered = T)
+
+colorsPlot4 <- c(brewer.pal(3, "Set2")[1:2],"red",brewer.pal(3, "Set2")[3])
+plot4 <- ggplot() 
+plot4 <- plot4_R0 %>%
+  ggplot(aes(x = date, y = value*5/(max(plot4_R0$value)), color = key))+
+  geom_glowing_line()+
+  labs(x=paste0("Days Since ",incidence_start_point," Cumulative Deaths per Million"), y = "R0", title="")
+plot4 <- plot4 +
+  geom_line(data=plot4_NPI, aes(x = date, y = value, group = key, color = key), size=1.5,alpha=.7,show.legend = F)
+plot4 <- plot4 +
+  guides(color=guide_legend(title="")) +
+  theme(legend.title=element_text(size=14))+
+  theme(axis.text.x = element_text(color="black",size = 13, angle = 0, hjust = .5, vjust = .5),
+        axis.text.y = element_text(color="black",size = 13, angle = 0),
+        axis.title.x = element_text(color="black",size = 13, angle = 0),
+        axis.title.y = element_text(color="black",size = 13, angle = 90)
+  )+
+  # scale_x_continuous(breaks=seq(1, 10, 1))+
+  # scale_colour_manual(values=randomColor(length(unique(plot3Data$key))), aesthetics = "colour") +
+  scale_y_continuous(name = "NPI Policy Scale", sec.axis = sec_axis(~./(5/(max(plot4_R0$value))), name = "R0"),limits = c(0,5))+
+  scale_colour_manual(values=colorsPlot4, aesthetics = "colour") +
+  theme(legend.text=element_text(size=9))+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))+
+  labs(x=NULL)
+
+# plot3
+# plot4
+# ---tree_Models---#########################################################################################################################################################################
 str(training_ready)
 str(testing_ready)
 
 # Create a Random Forest model with default parameters
 if(death_flag==F){
-  training_ready_sub2 <- subset(training_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered,confirmed_cum_per_million_lag_01,time))
+  training_ready_sub2 <- training_ready[,colnames(training_ready)[which(colnames(training_ready) %ni% listToRemove)]]
   training_ready_sub2 <- training_ready_sub2[,grep("death|MalePercent|FemalePercent", colnames(training_ready_sub2),invert = T)]
   for(i in (nLags+1):100){
     training_ready_sub2 <- training_ready_sub2[,grep(paste0(sprintf("lag_%02d", i)), colnames(training_ready_sub2),invert = T)]
@@ -535,7 +797,7 @@ if(death_flag==F){
   training_ready_sub2 %<>% mutate_if(is.character,as.numeric)
   training_ready_sub2 %<>% mutate_if(is.integer,as.numeric)
   # remove more columns we don't want in the model
-  testing_ready_sub2 <- subset(testing_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered,confirmed_cum_per_million_lag_01,time))
+  testing_ready_sub2 <- testing_ready[,colnames(testing_ready)[which(colnames(testing_ready) %ni% listToRemove)]]
   testing_ready_sub2 <- testing_ready_sub2[,grep("death|MalePercent|FemalePercent", colnames(testing_ready_sub2),invert = T)]
   for(i in (nLags+1):100){
     testing_ready_sub2 <- testing_ready_sub2[,grep(paste0(sprintf("lag_%02d", i)), colnames(testing_ready_sub2),invert = T)]
@@ -549,6 +811,11 @@ if(death_flag==F){
     training_ready_sub2 <- subset(training_ready_sub2, select=-c(confirmed_cum))
     testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(confirmed_cum))
     if(caret_flag == T){
+      # training_ready_sub2$lag_01_cut <- training_ready$lag_01_cut
+      # testing_ready_sub2 %<>% mutate_if(is.factor,as.character)  
+      # testing_ready_sub2 %<>% mutate_if(is.character,as.numeric)
+      # testing_ready_sub2 %<>% mutate_if(is.integer,as.numeric)
+      # testing_ready_sub2$lag_01_cut <- testing_ready$lag_01_cut
       caretRun <- caretFunction(name="confirmed_cum_per_million",dd=training_ready_sub2,n_trees = number_trees,gbm_flag=gbm_flag, bayesglm_flag=bayesglm_flag, gam_flag=gam_flag, glm_flag=glm_flag, rf_flag=rf_flag, all_flag=all_flag)
       best_model <- caretRun[["best_model_tmp"]]
       model_name <- caretRun[["model_name_tmp"]]
@@ -563,6 +830,11 @@ if(death_flag==F){
     # training_ready_sub2 <- subset(training_ready_sub2, select=-c(confirmed_cum_per_million))
     # testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(confirmed_cum_per_million))
     if(caret_flag == T){
+      # training_ready_sub2$lag_01_cut <- training_ready$lag_01_cut
+      # testing_ready_sub2 %<>% mutate_if(is.factor,as.character)  
+      # testing_ready_sub2 %<>% mutate_if(is.character,as.numeric)
+      # testing_ready_sub2 %<>% mutate_if(is.integer,as.numeric)
+      # testing_ready_sub2$lag_01_cut <- testing_ready$lag_01_cut
       caretRun <- caretFunction(name="confirmed_cum",dd=training_ready_sub2,n_trees = number_trees,gbm_flag=gbm_flag, bayesglm_flag=bayesglm_flag, gam_flag=gam_flag, glm_flag=glm_flag, rf_flag=rf_flag, all_flag=all_flag)
       best_model <- caretRun[["best_model_tmp"]]
       model_name <- caretRun[["model_name_tmp"]]
@@ -575,7 +847,7 @@ if(death_flag==F){
     }
   }
 }else if(death_flag==T){
-  training_ready_sub2 <- subset(training_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered,confirmed_cum_per_million_lag_01,time))
+  training_ready_sub2 <- training_ready[,colnames(training_ready)[which(colnames(training_ready) %ni% listToRemove)]]
   training_ready_sub2 <- training_ready_sub2[,grep("confirmed|MalePercent|FemalePercent", colnames(training_ready_sub2),invert = T)]
   for(i in (nLags+1):100){
     training_ready_sub2 <- training_ready_sub2[,grep(paste0(sprintf("lag_%02d", i)), colnames(training_ready_sub2),invert = T)]
@@ -585,7 +857,7 @@ if(death_flag==F){
   training_ready_sub2 %<>% mutate_if(is.character,as.numeric)
   training_ready_sub2 %<>% mutate_if(is.integer,as.numeric)
   # remove more columns we don't want in the model
-  testing_ready_sub2 <- subset(testing_ready, select=-c(date,Country.x,Country.y,ISO3,confirmed,death,Source,FullName,recovered,confirmed_cum_per_million_lag_01,time))
+  testing_ready_sub2 <- testing_ready[,colnames(testing_ready)[which(colnames(testing_ready) %ni% listToRemove)]]
   testing_ready_sub2 <- testing_ready_sub2[,grep("confirmed|MalePercent|FemalePercent", colnames(testing_ready_sub2),invert = T)]
   for(i in (nLags+1):100){
     testing_ready_sub2 <- testing_ready_sub2[,grep(paste0(sprintf("lag_%02d", i)), colnames(testing_ready_sub2),invert = T)]
@@ -599,6 +871,11 @@ if(death_flag==F){
     training_ready_sub2 <- subset(training_ready_sub2, select=-c(death_cum))
     testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(death_cum))
     if(caret_flag == T){
+      # training_ready_sub2$lag_01_cut <- training_ready$lag_01_cut
+      # testing_ready_sub2 %<>% mutate_if(is.factor,as.character)  
+      # testing_ready_sub2 %<>% mutate_if(is.character,as.numeric)
+      # testing_ready_sub2 %<>% mutate_if(is.integer,as.numeric)
+      # testing_ready_sub2$lag_01_cut <- testing_ready$lag_01_cut
       caretRun <- caretFunction(name="death_cum_per_million",dd=training_ready_sub2,n_trees = number_trees,gbm_flag=gbm_flag, bayesglm_flag=bayesglm_flag, gam_flag=gam_flag, glm_flag=glm_flag, rf_flag=rf_flag, all_flag=all_flag)
       best_model <- caretRun[["best_model_tmp"]]
       model_name <- caretRun[["model_name_tmp"]]
@@ -613,6 +890,11 @@ if(death_flag==F){
     # training_ready_sub2 <- subset(training_ready_sub2, select=-c(death_cum_per_million))
     # testing_ready_sub2 <- subset(testing_ready_sub2, select=-c(death_cum_per_million))
     if(caret_flag == T){
+      # training_ready_sub2$lag_01_cut <- training_ready$lag_01_cut
+      # testing_ready_sub2 %<>% mutate_if(is.factor,as.character)  
+      # testing_ready_sub2 %<>% mutate_if(is.character,as.numeric)
+      # testing_ready_sub2 %<>% mutate_if(is.integer,as.numeric)
+      # testing_ready_sub2$lag_01_cut <- testing_ready$lag_01_cut
       caretRun <- caretFunction(name="death_cum",dd=training_ready_sub2,n_trees = number_trees,gbm_flag=gbm_flag, bayesglm_flag=bayesglm_flag, gam_flag=gam_flag, glm_flag=glm_flag, rf_flag=rf_flag, all_flag=all_flag)
       best_model <- caretRun[["best_model_tmp"]]
       model_name <- caretRun[["model_name_tmp"]]
@@ -630,6 +912,7 @@ if(death_flag==F){
 # setting the NPIflag2 to "lastNPI" is our method of saying that we want to fill all the NAs in the forecasting period with the last empirical time points' NPI values
 # NPIflag2 <- "lastNPI"
 testing_ready_pred <- testing_ready_sub2
+
 breaker <- nrow(testing_ready_pred)-projectionTime+1
 # testing_ready_pred[(breaker-1):(breaker+1),grep("confirmed_cum_per_million", colnames(testing_ready_pred))]
 
@@ -653,7 +936,14 @@ for(i in breaker:nrow(testing_ready_pred)){
   for(l in 1:nLags){
     if(l==1){
       if(incidence_flag==T && death_flag==F){
-        testing_ready_pred[i,c(paste0("confirmed_cum_per_million_lag_01"))] <- testing_ready_pred[i-1,c(paste0("confirmed_cum_per_million"))]
+        if("confirmed_cum_per_million_lag_01" %in% colnames(testing_ready_pred)){
+          testing_ready_pred[i,c(paste0("confirmed_cum_per_million_lag_01"))] <- testing_ready_pred[i-1,c(paste0("confirmed_cum_per_million"))]
+        }
+        if("lag_01_cut" %in% colnames(testing_ready_pred)){
+          testing_ready_pred[i,c(paste0("lag_01_cut"))] <- as.numeric(cut(testing_ready_pred[i-1,c(paste0("confirmed_cum_per_million"))], breaks = myBreaks,
+                                                                          include.lowest = T, right = TRUE, dig.lab = 3,
+                                                                          ordered_result = T))        
+          }
       }else if(incidence_flag==T && death_flag==T){
         testing_ready_pred[i,c(paste0("death_cum_per_million_lag_01"))] <- testing_ready_pred[i-1,c(paste0("death_cum_per_million"))]
       }else if(incidence_flag==F && death_flag==F){
@@ -707,47 +997,61 @@ for(i in breaker:nrow(testing_ready_pred)){
 
 # Collect the data to be rady for ggplot
 pAll <- as.data.frame(pAll)
-pAll$time <- testing_ready_pred$time
+pAll$time <- testing_ready$time
+pAll$date <- testing_ready$date
+areNA <- which(is.na(pAll$date))
+for(i in areNA){
+  pAll$date[i] <- pAll$date[i-1]+1
+}
 
 if(incidence_flag==T && death_flag==F){
-  plot1Data_tmp <- testing_ready[,c("FullName","time","confirmed_cum_per_million")]
+  plot1Data_tmp <- testing_ready_OG[,c("FullName","time","confirmed_cum_per_million")]
 }else if(incidence_flag==T && death_flag==T){
-  plot1Data_tmp <- testing_ready[,c("FullName","time","death_cum_per_million")]
+  plot1Data_tmp <- testing_ready_OG[,c("FullName","time","death_cum_per_million")]
 }else if(incidence_flag==F && death_flag==F){
-  plot1Data_tmp <- testing_ready[,c("FullName","time","confirmed_cum")]
+  plot1Data_tmp <- testing_ready_OG[,c("FullName","time","confirmed_cum")]
 }else if(incidence_flag==F && death_flag==T){
-  plot1Data_tmp <- testing_ready[,c("FullName","time","death_cum")]
+  plot1Data_tmp <- testing_ready_OG[,c("FullName","time","death_cum")]
 }
 
 # Organize the data to be rady for ggplot
-plot1Data <- merge(pAll,plot1Data_tmp,by="time")
-colnames(plot1Data) <- c("time","prediction","country","actual")
-plot1Data <- plot1Data[order(plot1Data$time),]
-plot1Data$prediction <- as.numeric(plot1Data$prediction)
-plot1Data$actual <- as.numeric(plot1Data$actual)
+plot1Data <- plot1Data_tmp %>% left_join(pAll, by = c("time" = "time"))
+colnames(plot1Data) <- c("country","time","Actual","Prediction","date")
+plot1Data$time <- NULL
+plot1Data$date <- testing_ready_OG$date
+areNA <- which(is.na(plot1Data$date))
+for(i in areNA){
+  plot1Data$date[i] <- plot1Data$date[i-1]+1
+}
+plot1Data <- plot1Data[order(plot1Data$date),]
+plot1Data$Prediction <- as.numeric(plot1Data$Prediction)
+plot1Data$Actual <- as.numeric(plot1Data$Actual)
 plot1Data$country <- as.character(plot1Data$country)
 str(plot1Data)
 
 # Reshape the data to be rady for ggplot
-m1 <- reshape2::melt(plot1Data,id=c("country","time"))
-m1$time <- as.numeric(m1$time)
+m1 <- reshape2::melt(plot1Data,id=c("country","date"))
+m1$date <- as.numeric(m1$date)
 m1$value <- as.numeric(m1$value)
 m1$variable <- as.factor(m1$variable)
 m1$country <- as.factor(m1$country)
 str(m1)
-m1 <- m1[order(m1$time),]
+m1 <- m1[order(m1$date),]
 
 #---plotPrediction---#########################################################################################################################################################################
+
+m1$date <- as.Date(m1$date)
+predictColor <- rep("deepskyblue2",2)
+alphabeticalList <- sort(c("Predict","Actual"))
+alphabeticalIndex <- which(alphabeticalList == "Actual")
+predictColor[alphabeticalIndex] <- "red"
+
 plot_predict <- ggplot() 
+plot_predict <- subset(m1, variable == "Actual") %>%
+    ggplot(aes(x = date, y = value, color = variable))+
+    geom_glowing_line()
 plot_predict <- plot_predict +
-  # geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size=0.8,alpha=.7)+
-  geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size = 3, colour = 'red', alpha = 0.1) +
-  geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size = 2, colour = 'red', alpha = 0.2) +
-  geom_line(data=subset(m1, variable == "actual"), aes(x = time, y = value, group = country, color = country), size = 1, colour = 'red', alpha = 0.5) +
-  geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), lwd=.8, colour = 'deepskyblue3', linetype = "solid",alpha=.7)
-# geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size = 3, colour = 'red', alpha = 0.1, linetype = "3313") +
-# geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size = 2, colour = 'red', alpha = 0.2, linetype = "3313") +
-# geom_line(data=subset(m1, variable == "prediction"), aes(x = time, y = value, group = country, color = country), size = 1, colour = 'red', alpha = 0.5, linetype = "3313") +
+    geom_line(data=subset(m1, variable == "Prediction"), aes(x = date, y = value, group = variable, color = variable), size=2,alpha=.95,show.legend = T,linetype = "solid")
 if(incidence_flag==T && death_flag==F){
   plot_predict <- plot_predict +
     labs(x=paste0("Days Since ",incidence_start_point," Cumulative Counts per Million"), y = "Confirmed Cumulative Cases per Million", title="")
@@ -770,11 +1074,12 @@ plot_predict <- plot_predict +
         axis.title.y = element_text(color="black",size = 13, angle = 90)
   )+
   # scale_x_continuous(breaks=seq(1, 10, 1))+
-  # scale_colour_manual(values=c(lineColors))
+  scale_colour_manual(values=predictColor)+
   theme(legend.text=element_text(size=16))+
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
-        panel.background = element_blank(), axis.line = element_line(colour = "black"))
-
+        panel.background = element_blank(), axis.line = element_line(colour = "black"))+
+  labs(x=NULL)
+# plot_predict
 
 #---variableImportancePlot---#########################################################################################################################################################################
 
@@ -821,30 +1126,30 @@ plot_varimp <- ggplot2::ggplot(df2) +
   geom_point(aes(x = variable, y = imp, col = variable), 
              size = 4, show.legend = F) +
   coord_flip() +
-  theme_bw()
+  labs(y="Importance", x = NULL, title="")+
+theme_bw()
 
 #---cumulativePlot---#########################################################################################################################################################################
-rmse_val <- sqrt( sum( (plot1Data$prediction[1:(nrow(plot1Data)-projectionTime)] - plot1Data$actual[1:(nrow(plot1Data)-projectionTime)])^2 ) / (nrow(plot1Data)-projectionTime) )
+rmsedf <- plot1Data[(breakpoint+1):(nrow(plot1Data)-projectionTime),]
+rmse_val <- sqrt( sum( (rmsedf$Prediction - rmsedf$Actual)^2 ,na.rm = T) / (nrow(rmsedf)) )
 rmse_val <- round(rmse_val,3)
-gl <- list(plot1,plot_predict,plot_varimp)
-grid.arrange(grobs = gl, top = textGrob(paste0(testing_ready$FullName[1]," ",model_name," RMSE = ",rmse_val), gp=gpar(fontsize=20)), layout_matrix = rbind(c(1,1,1,1,1,3,3,3),
-                                                                                                                                                           c(1,1,1,1,1,3,3,3),
-                                                                                                                                                           c(1,1,1,1,1,3,3,3),
-                                                                                                                                                           c(1,1,1,1,1,3,3,3),
-                                                                                                                                                           c(2,2,2,2,2,3,3,3),
-                                                                                                                                                           c(2,2,2,2,2,3,3,3),
-                                                                                                                                                           c(2,2,2,2,2,3,3,3),
-                                                                                                                                                           c(2,2,2,2,2,3,3,3)))
-# grid.arrange(grobs = gl, top = textGrob(paste0(testing_ready$FullName[1]," ",model_name," RMSE = ",rmse_val), gp=gpar(fontsize=20)), layout_matrix = rbind(c(1,1,1,1,1,2,2,2),
-#                                                                                                                         c(1,1,1,1,1,2,2,2),
-#                                                                                                                         c(1,1,1,1,1,2,2,2),
-#                                                                                                                         c(3,3,3,3,3,3,3,3),
-#                                                                                                                         c(3,3,3,3,3,3,3,3),
-#                                                                                                                         c(3,3,3,3,3,3,3,3),
-#                                                                                                                         c(3,3,3,3,3,3,3,3),
-#                                                                                                                         c(3,3,3,3,3,3,3,3)))
-
-
+gl <- list(plot1,plot2,plot_predict,plot_varimp,plot3,plot4)
+grid.arrange(grobs = gl, top = textGrob(paste0(testing_ready$FullName[1]," ",model_name," RMSE = ",rmse_val), gp=gpar(fontsize=20)), layout_matrix = rbind(c(1,1,1,1,1,4,4,4),
+                                                                                                                                                           c(1,1,1,1,1,4,4,4),
+                                                                                                                                                           c(1,1,1,1,1,4,4,4),
+                                                                                                                                                           c(1,1,1,1,1,4,4,4),
+                                                                                                                                                           c(1,1,1,1,1,4,4,4),
+                                                                                                                                                           c(2,2,2,2,NA,4,4,4),
+                                                                                                                                                           c(2,2,2,2,NA,4,4,4),
+                                                                                                                                                           c(2,2,2,2,5,5,5,5),
+                                                                                                                                                           c(2,2,2,2,5,5,5,5),
+                                                                                                                                                           c(2,2,2,2,5,5,5,5),
+                                                                                                                                                           c(3,3,3,3,5,5,5,5),
+                                                                                                                                                           c(3,3,3,3,6,6,6,6),
+                                                                                                                                                           c(3,3,3,3,6,6,6,6),
+                                                                                                                                                           c(3,3,3,3,6,6,6,6),
+                                                                                                                                                           c(3,3,3,3,6,6,6,6)))
+#
 # rpart.plot(best_model)
 # 
 
