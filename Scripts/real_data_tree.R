@@ -26,12 +26,12 @@ library(zoo)
 library(EpiEstim)
 library(viridis)
 library(RColorBrewer)
+# devtools::install_github("delabj/ggCyberPunk")
 library(ggCyberPunk)
 # library(earth)
 '%ni%' <- Negate('%in%')
 
 #---randomForestFunction---#########################################################################################################################################################################
-
 randomForestFunction <- function(name="confirmed_cum_per_million",dd=training_ready_sub2){
   # enable parallel processing
   # dd_fun <- eval(parse(text=paste(dd)))  
@@ -46,10 +46,10 @@ randomForestFunction <- function(name="confirmed_cum_per_million",dd=training_re
 
 #---caretFunction---#########################################################################################################################################################################
 # debugging
-name="confirmed_cum_per_million"
-dd="training_ready_sub2"
+# name="confirmed_cum_per_million"
+# dd="training_ready_sub2"
 
-caretFunction <- function(name="confirmed_cum_per_million",dd=training_ready_sub2, num_cores = detectCores(), nasaction = na.omit, n_trees = (1:30)*25, gbm_flag=T, bayesglm_flag=F, gam_flag=F, glm_flag=F, rf_flag=T, all_flag=F){
+caretFunction <- function(name="confirmed_cum_per_million",dd=training_ready_sub2, num_cores = detectCores(), nasaction = na.omit, n_trees = c((1:10)*100,1500,2000), gbm_flag=F, bayesglm_flag=F, gam_flag=F, glm_flag=F, rf_flag=T, all_flag=F){
   # enable parallel processing
   print('Number of cores being used = ')
   print(paste0(num_cores, ", of possible ", detectCores()," cores"))
@@ -58,18 +58,96 @@ caretFunction <- function(name="confirmed_cum_per_million",dd=training_ready_sub
   dd_fun <- dd
   mod_formula <- as.formula(paste(name,"~","."))
   
-  # set seed for reproducibility
-  set.seed(825)
-  # implemnting CARET with 10-fold cross-valication
-  fitControl <- trainControl(## 10-fold CV
-    method = "repeatedcv",
-    # number = 10,
-    number = 2,
-    ## repeated ten times
-    # repeats = 10,
-    repeats = 2,
-    allowParallel = TRUE)
-  tuneLength.num <- 5
+  set.seed(1)
+
+  # modellist <- list()
+  if(rf_flag==T | all_flag==T){
+    rf_flag=T
+    print("Training rf.mod ...")
+    
+    x <- dd[complete.cases(dd),which(colnames(dd) %ni% name)]
+    y <- dd[complete.cases(dd),which(colnames(dd) %in% name)]
+    bestMtry <- tuneRF(x, y, stepFactor = 1.5, improve = 1e-5, ntree = 500, na.action=nasaction)
+    bestMtry <- as.data.frame(bestMtry)
+    mtry_best <- bestMtry$mtry[which.min(bestMtry$OOBError)]
+    
+    #train with different ntree parameters
+    # for (ntree in n_trees){
+    for (ntree in 1000){
+      set.seed(123)
+      print(" ")
+      print(ntree)
+      print(n_trees)
+      # x <- dd[complete.cases(dd),which(colnames(dd) %ni% name)]
+      # y <- dd[complete.cases(dd),which(colnames(dd) %in% name)]
+      # bestMtry <- tuneRF(x, y, stepFactor = 1.5, improve = 1e-5, ntree = ntree, na.action=nasaction)
+      # bestMtry <- as.data.frame(bestMtry)
+      # mtry_best <- bestMtry$mtry[which.min(bestMtry$OOBError)]
+
+      # seq(from=mtry_best*.5, to=mtry_best, length.out = length(n_trees))
+      # tunegrid <- expand.grid(mtry=,ntree=n_trees)
+      tunegrid <- expand.grid(.mtry = c(mtry_best))
+      
+      control <- trainControl(method="repeatedcv", 
+                              number=10, 
+                              repeats=3,
+                              allowParallel = TRUE)
+
+      rf.mod <- train(mod_formula,
+                   data = dd,
+                   method = 'rf',
+                   # metric = 'Accuracy',
+                   tuneGrid = tunegrid,
+                   trControl = control,
+                   ntree = ntree,
+                   na.action = nasaction)
+      # key <- toString(ntree)
+      # modellist[[key]] <- rf.mod
+    }
+    
+    # # set seed for reproducibility
+    # set.seed(825)
+    # rf.mod <- train(mod_formula,
+    #                 data = dd_fun,
+    #                 method = "rf",
+    #                 trControl = control,
+    #                 tuneGrid=tunegrid,
+    #                 # metric=metric1,
+    #                 # tuneLength=tuneLength.num,
+    #                 ntree = n_trees,
+    #                 na.action = nasaction)
+  }else{rf.mod <- NA}
+  
+  # results <- resamples(modellist)
+  # summary(results) #1000 trees looks like the best
+  # dotplot(results)
+  # stopCluster(cores)
+  
+  # # implemnting CARET with 10-fold cross-valication
+  # fitControl <- trainControl(## 10-fold CV
+  #   method = "repeatedcv",
+  #   number = 10,
+  #   # number = 2,
+  #   ## repeated ten times
+  #   # repeats = 10,
+  #   repeats = 3,
+  #   search = "random",
+  #   allowParallel = TRUE)
+  # tuneLength.num <- 2
+  # 
+  # 
+  # if(rf_flag==T | all_flag==T){
+  #   rf_flag=T
+  #   print("Training rf.mod ...")
+  #   rf.mod <- train(mod_formula,
+  #                   data = dd_fun,
+  #                   method = "rf",
+  #                   trControl = fitControl,
+  #                   tuneLength=tuneLength.num,
+  #                   na.action = nasaction)
+  #   rf.mod
+  # }else{rf.mod <- NA}
+  
   # Train a stochastic gradient boosting model ('gbm')
   #   grid search
   if(gbm_flag==T | all_flag==T){
@@ -127,18 +205,6 @@ caretFunction <- function(name="confirmed_cum_per_million",dd=training_ready_sub
                        na.action = nasaction)
     glm.mod
   }else{glm.mod <- NA}
-  
-  if(rf_flag==T | all_flag==T){
-    rf_flag=T
-    print("Training rf.mod ...")
-    rf.mod <- train(mod_formula,
-                    data = dd_fun,
-                    method = "rf",
-                    trControl = fitControl,
-                    tuneLength=tuneLength.num,
-                    na.action = nasaction)
-    rf.mod
-  }else{rf.mod <- NA}
   
   flag_list <- c(gbm_flag, bayesglm_flag, gam_flag, glm_flag, rf_flag)
   if(sum(flag_list)>1){
@@ -237,9 +303,11 @@ NPIflag2 <- "lastNPI"
 # The Percent of the timeframe you want to reserve for testing a country (the rest of that country's time series is included into the model)
 testingTimeFrame <- 0.5
 # Columns you don't want to be in the model
-# listToRemove <- c("date","Country.x","Country.y","ISO3","confirmed","death","Source","FullName","recovered","confirmed_cum_per_million_lag_01")
-listToRemove <- c("date","Country.x","Country.y","ISO3","confirmed","death","Source","FullName","recovered","lag_01_cut")
+listToRemove <- c("date","Country.x","Country.y","ISO3","confirmed","death","Source","FullName","recovered","confirmed_cum_per_million_lag_01")
+# listToRemove <- c("date","Country.x","Country.y","ISO3","confirmed","death","Source","FullName","recovered","lag_01_cut")
+# listToRemove <- c("date","Country.x","Country.y","ISO3","confirmed","death","Source","FullName","recovered","lag_01_cut","confirmed_cum_per_million_lag_01")
 # listToRemove <- c("date","Country.x","Country.y","ISO3","confirmed","death","Source","FullName","recovered")
+nCuts <- 1000
 
 #---dataSetup---#########################################################################################################################################################################
 data_clean <- read.csv("./InputData/ML_features.csv")
@@ -260,8 +328,9 @@ testing_countries <- c("USA")
 # https://docs.google.com/spreadsheets/d/1vrKvs52OAxuB7x2kT9r1q6IcIBxGEQsNRHsK_o7h3jo/edit#gid=378237553
 # training_countries_all <- c("ITA","FRA","GBR")
 # training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","USA","SWE","AUT","CHE","DEU","FRA")
-training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","HUB","KOR","USA","SWE","AUT","CHE","DEU","FRA","DZA","IRN","CAN","TUR","BEL","ANT","PRT","ISR","RUS","NOR","IRL","AUS","IND","DNK","CHL","CZE","JPN","UKR","MAR","ARG","SGP","ROU")
-# training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","KOR","USA","SWE","AUT","CHE","DEU","FRA","DZA","IRN","CAN","TUR","BEL","ANT","PRT","ISR","RUS","NOR","IRL","AUS","IND","DNK","CHL","CZE","JPN","UKR","MAR","ARG","SGP","ROU")
+# training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","KOR","USA","SWE","AUT","CHE","DEU","FRA","DZA","IRN","CAN","PRT","ISR","RUS","NOR","AUS","DNK","CHL","CZE","JPN","UKR","MAR","ARG")
+# training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","HUB","KOR","USA","SWE","AUT","CHE","DEU","FRA","DZA","IRN","CAN","TUR","BEL","ANT","PRT","ISR","RUS","NOR","IRL","AUS","IND","DNK","CHL","CZE","JPN","UKR","MAR","ARG","SGP","ROU")
+training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","KOR","USA","SWE","AUT","CHE","DEU","FRA","DZA","IRN","CAN","TUR","BEL","ANT","PRT","ISR","RUS","NOR","IRL","AUS","IND","DNK","CHL","CZE","JPN","UKR","MAR","ARG","SGP","ROU")
 
 training_countries <- training_countries_all[which(training_countries_all != testing_countries)]
 
@@ -355,8 +424,14 @@ for(i in 1:length(training_countries)){
   toCalcR0 <- training_subset_aligned[,c("date","confirmed")]
   colnames(toCalcR0) <- c("dates","I")
   toCalcR0$I[toCalcR0$I<0] <- NA
-  #Get of erroneous negative counts... they sneak throught the API sometimes. Lets linearly interpolate them:
+  #Get of erroneous negative counts... they sneak throught the API sometimes. 
+  # But if thre is a negative at teh end... are the last one lets just make it equal to the n-1 one
+  if(is.na(tail(toCalcR0$I,1))){
+    toCalcR0$I[length(toCalcR0$I)] <- toCalcR0$I[length(toCalcR0$I)-1]
+  }
+  # If the NA is not at the end, Lets linearly interpolate them:
   toCalcR0$I <- na.approx(toCalcR0$I)
+
   res_uncertain_si <- estimate_R(toCalcR0,
                                  method = "uncertain_si",
                                  config = config)
@@ -406,7 +481,13 @@ for(i in 1:length(testing_countries)){
   toCalcR0 <- testing_subset_aligned[,c("date","confirmed")]
   colnames(toCalcR0) <- c("dates","I")
   toCalcR0$I[toCalcR0$I<0] <- NA
-  #Get of erroneous negative counts... they sneak throught the API sometimes. Lets linearly interpolate them:
+  #Get of erroneous negative counts... they sneak throught the API sometimes. 
+  #Get of erroneous negative counts... they sneak throught the API sometimes. 
+  # But if thre is a negative at teh end... are the last one lets just make it equal to the n-1 one
+  if(is.na(tail(toCalcR0$I,1))){
+    toCalcR0$I[length(toCalcR0$I)] <- toCalcR0$I[length(toCalcR0$I)-1]
+  }
+  # If the NA is not at the end, Lets linearly interpolate them:
   toCalcR0$I <- na.approx(toCalcR0$I)
   res_uncertain_si <- estimate_R(toCalcR0,
                                  method = "uncertain_si",
@@ -459,9 +540,10 @@ training_ready <- as.data.frame(rbind(training_ready_OG,training_ready_OG[1:brea
 
 
 if(incidence_flag==T && death_flag==F){
-  # geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1) +
-  h <- hist(training_ready$confirmed_cum_per_million_lag_01,breaks = 100)
-  # myBreaks <- quantile(training_ready$confirmed_cum_per_million_lag_01,seq(0, 1, by= 0.1))
+  # Even breaks coming from histogram
+  h <- hist(training_ready$confirmed_cum_per_million_lag_01,breaks = nCuts)
+  # Unevenly spaced breaks coming from quantiles
+  # myBreaks <- quantile(training_ready$confirmed_cum_per_million_lag_01,seq(0, 1, by= 1/nCuts))
   myBreaks <- h$breaks
   training_ready$lag_01_cut <- as.numeric(cut(training_ready$confirmed_cum_per_million_lag_01, breaks = myBreaks,
                                    include.lowest = T, right = TRUE, dig.lab = 3,
@@ -781,7 +863,7 @@ plot4 <- plot4 +
 
 # plot3
 # plot4
-# ---tree_Models---#########################################################################################################################################################################
+#---tree_Models---#########################################################################################################################################################################
 str(training_ready)
 str(testing_ready)
 
@@ -1134,6 +1216,7 @@ rmsedf <- plot1Data[(breakpoint+1):(nrow(plot1Data)-projectionTime),]
 rmse_val <- sqrt( sum( (rmsedf$Prediction - rmsedf$Actual)^2 ,na.rm = T) / (nrow(rmsedf)) )
 rmse_val <- round(rmse_val,3)
 gl <- list(plot1,plot2,plot_predict,plot_varimp,plot3,plot4)
+pdf("finalPlot.pdf",width = 24, height = 24)
 grid.arrange(grobs = gl, top = textGrob(paste0(testing_ready$FullName[1]," ",model_name," RMSE = ",rmse_val), gp=gpar(fontsize=20)), layout_matrix = rbind(c(1,1,1,1,1,4,4,4),
                                                                                                                                                            c(1,1,1,1,1,4,4,4),
                                                                                                                                                            c(1,1,1,1,1,4,4,4),
@@ -1149,7 +1232,8 @@ grid.arrange(grobs = gl, top = textGrob(paste0(testing_ready$FullName[1]," ",mod
                                                                                                                                                            c(3,3,3,3,6,6,6,6),
                                                                                                                                                            c(3,3,3,3,6,6,6,6),
                                                                                                                                                            c(3,3,3,3,6,6,6,6)))
+dev.off()
 #
-# rpart.plot(best_model)
+# plot(best_model)
 # 
 
