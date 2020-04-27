@@ -12,7 +12,6 @@ library(randomcoloR)
 #
 library(gridExtra)
 library(grid)
-library(lattice)
 library(ggpubr)
 #
 library(caret)
@@ -28,6 +27,8 @@ library(viridis)
 library(RColorBrewer)
 # devtools::install_github("delabj/ggCyberPunk")
 library(ggCyberPunk)
+library(corrplot)
+library(ranger)
 # library(earth)
 '%ni%' <- Negate('%in%')
 
@@ -86,24 +87,42 @@ caretFunction <- function(name="confirmed_cum_per_million",dd=training_ready_sub
 
       # seq(from=mtry_best*.5, to=mtry_best, length.out = length(n_trees))
       # tunegrid <- expand.grid(mtry=,ntree=n_trees)
-      tunegrid <- expand.grid(.mtry = c(mtry_best))
+      # tunegrid <- expand.grid(.mtry = c(mtry_best))
+      tunegrid <- expand.grid(.mtry = c(mtry_best),
+                              .splitrule = c('gini'),
+                              .min.node.size = c(5,10,20))
       
-      control <- trainControl(method="repeatedcv", 
-                              number=10, 
-                              repeats=3,
+      control <- trainControl(method="cv", 
+                              number=3, 
+                              # repeats=3,
+                              # verboseIter = T,
+                              # classProbs = T,
                               allowParallel = TRUE)
 
       rf.mod <- train(mod_formula,
-                   data = dd,
-                   method = 'rf',
-                   # metric = 'Accuracy',
-                   tuneGrid = tunegrid,
-                   trControl = control,
-                   ntree = ntree,
-                   na.action = nasaction)
+                      data = dd,
+                      method = 'ranger',
+                      na.action = nasaction,
+                      keep.inbag = TRUE,
+                      replace = TRUE,
+                      trControl = control)
+      
+      # rf.mod <- train(mod_formula,
+      #              data = dd,
+      #              # method = 'rf',
+      #              method = 'ranger',
+      #              # importance = "none",
+      #              # metric = 'Accuracy',
+      #              tuneGrid = tunegrid,
+      #              trControl = control,
+      #              # ntree = ntree,
+      #              na.action = nasaction,
+      #              replace = TRUE,
+      #              keep.inbag = TRUE)
       # key <- toString(ntree)
       # modellist[[key]] <- rf.mod
     }
+    
     
     # # set seed for reproducibility
     # set.seed(825)
@@ -266,7 +285,8 @@ predictFunction <- function(name=best_model, mod_name=model_name, dd=testing_rea
   }else if("rf.mod" == mod_name){
     # dd[,which(names(dd) %ni% c("lag_01_cut"))] %<>% mutate_if(is.factor,as.character)  
     # dd[,which(names(dd) %ni% c("lag_01_cut"))] %<>% mutate_if(is.character,as.numeric)
-    predict_tmp <- predict(name, dd, na.action = nasaction)
+    # predict_tmp <- predict(name, dd, na.action = nasaction)
+    predict_tmp <- predict(name, dd, na.action = nasaction, type='se', se.method='infjack')
   }
   return(predict_tmp)
 }
@@ -301,7 +321,7 @@ projectionTime <- 14
 NPIflag1 <- "autofill"
 NPIflag2 <- "lastNPI"
 # The Percent of the timeframe you want to reserve for testing a country (the rest of that country's time series is included into the model)
-testingTimeFrame <- 0.5
+testingTimeFrame <- 0.8
 # Columns you don't want to be in the model
 listToRemove <- c("date","Country.x","Country.y","ISO3","confirmed","death","Source","FullName","recovered","confirmed_cum_per_million_lag_01")
 # listToRemove <- c("date","Country.x","Country.y","ISO3","confirmed","death","Source","FullName","recovered","lag_01_cut")
@@ -1011,6 +1031,10 @@ if(NPIflag2 == "lastNPI"){
 # testing_ready$Social_Distancing
 # testing_ready_pred$Social_Distancing
 
+
+
+
+
 #---makePrediction---#########################################################################################################################################################################
 # p1 <- predict(best_model, testing_ready_pred[1:(breaker-1),], na.action = na.pass, n.trees = number_trees)
 p1 <- predictFunction(name=best_model, mod_name=model_name,dd=testing_ready_pred[1:(breaker-1),], n_trees = number_trees)
@@ -1096,7 +1120,7 @@ if(incidence_flag==T && death_flag==F){
   plot1Data_tmp <- testing_ready_OG[,c("FullName","time","death_cum")]
 }
 
-# Organize the data to be rady for ggplot
+# Organize the data to be ready for ggplot
 plot1Data <- plot1Data_tmp %>% left_join(pAll, by = c("time" = "time"))
 colnames(plot1Data) <- c("country","time","Actual","Prediction","date")
 plot1Data$time <- NULL
@@ -1111,7 +1135,7 @@ plot1Data$Actual <- as.numeric(plot1Data$Actual)
 plot1Data$country <- as.character(plot1Data$country)
 str(plot1Data)
 
-# Reshape the data to be rady for ggplot
+# Reshape the data to be ready for ggplot
 m1 <- reshape2::melt(plot1Data,id=c("country","date"))
 m1$date <- as.numeric(m1$date)
 m1$value <- as.numeric(m1$value)
@@ -1161,7 +1185,7 @@ plot_predict <- plot_predict +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
         panel.background = element_blank(), axis.line = element_line(colour = "black"))+
   labs(x=NULL)
-# plot_predict
+plot_predict
 
 #---variableImportancePlot---#########################################################################################################################################################################
 
@@ -1236,4 +1260,29 @@ dev.off()
 #
 # plot(best_model)
 # 
+
+
+# --- Output variables for RShiny App -----
+# Saving on object in RData format
+save(plot1, plot_predict, plot2, plot3, plot4, best_model,  file = "./COVID-19_Shiny_Web_App/Inputs/USA_Cases_data.RData")
+
+
+
+# --- Correlation between NPI data and google data -----
+# look at the correlation matrix betweten the google mobility data and the data collected for NPIs
+# cerate dataframe
+NPI_google_df = tibble(data_clean[c("date", "ISO3","Google_Residential", "Google_Workplaces", "Google_Transit_stations",
+                                    "Google_Parks", "Google_Grocery_pharmacy", "Google_Retail_recreation",
+                                    "Social_Distancing", "Social_Distancing_Lag_3","Social_Distancing_Lag_7", "Social_Distancing_Lag_10", "Social_Distancing_Lag_14")]) #,
+                                    # "Quaranting_Cases", "Quaranting_Cases_Lag_3", "Quaranting_Cases_Lag_7", "Quaranting_Cases_Lag_10", "Quaranting_Cases_Lag_14",
+                                    # "Close_Border","Close_Border_Lag_3","Close_Border_Lag_7","Close_Border_Lag_10","Close_Border_Lag_14")])
+
+NPI_google_df <- NPI_google_df %>%
+  drop_na() %>%
+  select(-c(date, ISO3))
+glimpse(NPI_google_df)
+
+NPI_google_cor_mat <- cor(NPI_google_df)
+NPI_corrplot <- corrplot(NPI_google_cor_mat, method="circle", type="upper")
+
 
