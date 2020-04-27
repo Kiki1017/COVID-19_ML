@@ -1,42 +1,39 @@
 library(shiny)
-install.packages("shinythemes")
+# install.packages("shinythemes")
 library(shinythemes)
+library(ggplot2)
 
-# Define UI for application that draws a histogram
+# Define UI for application that displays model
 ui <- fluidPage(theme = shinytheme("simplex"),
    
    # Application title
-   titlePanel("Old Faithful Geyser Data"),
+   titlePanel("The COVID Model"),
    
-   # Sidebar with a slider input for number of bins 
+   # Sidebar with a select box input for country 
    sidebarLayout(
       sidebarPanel(
-         sliderInput("bins",
-                     "Number of bins:",
-                     min = 1,
-                     max = 50,
-                     value = 30)
+         selectInput(inputId = "country",
+                     label = "Country",
+                     choices = c("United States" = "USA"))
       ),
       
-      # Show a plot of the generated distribution
+      # Show a plot of the confirmed cumulative cases per million
       mainPanel(
-         plotOutput("distPlot")
+         plotOutput("plot1")
       )
    )
 )
 
-# Define server logic required to draw a histogram
+# Define server logic required to display model
 server <- function(input, output) {
-   
-   output$distPlot <- renderPlot({
-      # generate bins based on input$bins from ui.R
-      x    <- faithful[, 2] 
-      bins <- seq(min(x), max(x), length.out = input$bins + 1)
-      
-      # draw the histogram with the specified number of bins
-      hist(x, breaks = bins, col = 'darkgray', border = 'white')
-   })
-}
+  output$plot1 <- reactivePlot(function() {
+    # check for the input country
+    if (input$country == "USA") {
+      # USA
+      load(./)
+    }
+  })
+  }
 
 # Run the application 
 shinyApp(ui = ui, server = server)
