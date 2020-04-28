@@ -15,9 +15,15 @@ library(dplyr)
 library(tidyr)
 library(ggplot2)
 library(data.table)
+# devtools::install_github("covid19r/coronavirus")
 library(coronavirus)
 library(ggpubr)
 library(readxl)
+library(tidyverse)
+library(purrr)
+# moving average
+library(zoo)
+
 
 # Update data?
 update_datasets()
@@ -66,7 +72,8 @@ country_timeseries <- function(df, country, incidence=T, plot=F){
     ungroup()
   if(incidence==T){
     output <- output %>%
-      mutate(confirmed_cum_per_million = cumsum(confirmed) / (pop/1000000)) %>%
+      # mutate(confirmed_cum_per_million = cumsum(confirmed) / (pop/1000000)) %>%
+      mutate(confirmed_cum_per_million = confirmed / (pop/1000000)) %>%
       mutate(death_cum_per_million = cumsum(death) / (pop/1000000)) %>%
       mutate(confirmed_cum = cumsum(confirmed)) %>%
       mutate(death_cum = cumsum(death))
@@ -186,6 +193,7 @@ output_df <- create_COVID_ML_df(coronavirus, num_cases_min = 1000, num_lag = 20,
 #   output_df$ISO3[output_df$ISO3 == "CHN"] <- "HUB"
 #   
 # }
+
 
 write.csv(output_df, file="InputData/data_COVID_2020_04_02.csv")
 

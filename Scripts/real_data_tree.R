@@ -28,11 +28,12 @@ library(RColorBrewer)
 # devtools::install_github("delabj/ggCyberPunk")
 library(ggCyberPunk)
 library(corrplot)
-library(ranger)
+# library(ranger)
 # library(earth)
 '%ni%' <- Negate('%in%')
 
 #---randomForestFunction---#########################################################################################################################################################################
+# this function isn't really used anymore because caret is used instead
 randomForestFunction <- function(name="confirmed_cum_per_million",dd=training_ready_sub2){
   # enable parallel processing
   # dd_fun <- eval(parse(text=paste(dd)))  
@@ -46,6 +47,7 @@ randomForestFunction <- function(name="confirmed_cum_per_million",dd=training_re
 }
 
 #---caretFunction---#########################################################################################################################################################################
+# the caret function does the rf model
 # debugging
 # name="confirmed_cum_per_million"
 # dd="training_ready_sub2"
@@ -101,7 +103,7 @@ caretFunction <- function(name="confirmed_cum_per_million",dd=training_ready_sub
 
       rf.mod <- train(mod_formula,
                       data = dd,
-                      method = 'ranger',
+                      # method = 'ranger',
                       na.action = nasaction,
                       keep.inbag = TRUE,
                       replace = TRUE,
@@ -259,7 +261,7 @@ caretFunction <- function(name="confirmed_cum_per_million",dd=training_ready_sub
 }
 
 #---predictFunction---#########################################################################################################################################################################
-
+# the predict function is called when we want to use the tree to make predictions
 predictFunction <- function(name=best_model, mod_name=model_name, dd=testing_ready_pred, n_trees = (1:30)*25, nasaction = na.omit){
   # enable parallel processing
   # predict_df <- eval(parse(text=paste(dd)))
@@ -285,8 +287,8 @@ predictFunction <- function(name=best_model, mod_name=model_name, dd=testing_rea
   }else if("rf.mod" == mod_name){
     # dd[,which(names(dd) %ni% c("lag_01_cut"))] %<>% mutate_if(is.factor,as.character)  
     # dd[,which(names(dd) %ni% c("lag_01_cut"))] %<>% mutate_if(is.character,as.numeric)
-    # predict_tmp <- predict(name, dd, na.action = nasaction)
-    predict_tmp <- predict(name, dd, na.action = nasaction, type='se', se.method='infjack')
+    predict_tmp <- predict(name, dd, na.action = nasaction)
+    # predict_tmp <- predict(name, dd, na.action = nasaction, type='se', se.method='infjack')
   }
   return(predict_tmp)
 }
@@ -296,7 +298,8 @@ predictFunction <- function(name=best_model, mod_name=model_name, dd=testing_rea
 #---initialFlags---#########################################################################################################################################################################
 # TRUE if you want to evaluate multiple models
 caret_flag <- T
-number_trees <- (1:30)*25
+# number_trees <- (1:30)*25
+number_trees <- 1000
 gbm_flag=F
 bayesglm_flag=F
 gam_flag=F
@@ -315,21 +318,31 @@ if(death_flag==T){
   incidence_start_point <- incidence_start_point*(5.9/100)
   count_start_point <- count_start_point*(5.9/100)
 }
-
+# the number of lag factors you want
 nLags <- 1
-projectionTime <- 14
+# the time you want to forecast the predictiont
+forecastingTime <- 14
+# autofill the missing datapoints in NPI data
 NPIflag1 <- "autofill"
+# use the last NPI datapoints for the forecasting period
 NPIflag2 <- "lastNPI"
 # The Percent of the timeframe you want to reserve for testing a country (the rest of that country's time series is included into the model)
-testingTimeFrame <- 0.8
+# for example if testingTimeFrame <- 0.8, then 20% of the timeseries will be used to train, and 80% will be used to predict
+testingTimeFrame <- .9
 # Columns you don't want to be in the model
-listToRemove <- c("date","Country.x","Country.y","ISO3","confirmed","death","Source","FullName","recovered","confirmed_cum_per_million_lag_01")
+# listToRemove <- c("date","Country.x","Country.y","ISO3","confirmed","death","Source","FullName","recovered","confirmed_cum_per_million_lag_01","movingAverage_Lag_1","movingAverage_Lag_2","movingAverage","movingAverage_diff","lag_01_cut")
+listToRemove <- c("date","Country.x","Country.y","ISO3","confirmed","death","Source","FullName","recovered","confirmed_cum_per_million_lag_01","movingAverage","movingAverage_Lag_1","movingAverage_Lag_3","movingAverage_Lag_3","movingAverage_Lag_7","movingAverage_Lag_14","lag_01_cut","time")
+# listToRemove <- c("date","Country.x","Country.y","ISO3","confirmed","death","Source","FullName","recovered","confirmed_cum_per_million_lag_01","movingAverage_Lag_2","movingAverage","lag_01_cut","time")
+#
+# listToRemove <- c("date","Country.x","Country.y","ISO3","confirmed","death","Source","FullName","recovered","confirmed_cum_per_million_lag_01")
 # listToRemove <- c("date","Country.x","Country.y","ISO3","confirmed","death","Source","FullName","recovered","lag_01_cut")
 # listToRemove <- c("date","Country.x","Country.y","ISO3","confirmed","death","Source","FullName","recovered","lag_01_cut","confirmed_cum_per_million_lag_01")
 # listToRemove <- c("date","Country.x","Country.y","ISO3","confirmed","death","Source","FullName","recovered")
+# If you are leaving lag_01_cut in the model, choose the number of cuts you want to bin it into
 nCuts <- 1000
 
 #---dataSetup---#########################################################################################################################################################################
+# read in raw data
 data_clean <- read.csv("./InputData/ML_features.csv")
 data_clean$date <- as.Date(data_clean$date)
 
@@ -337,6 +350,7 @@ data_clean$date <- as.Date(data_clean$date)
 glimpse(data_clean)
 summary(data_clean)
 
+# Choose the testing country
 testing_countries <- c("USA")
 # testing_countries <- c("ITA")
 # testing_countries <- c("BRA")
@@ -350,18 +364,21 @@ testing_countries <- c("USA")
 # training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","USA","SWE","AUT","CHE","DEU","FRA")
 # training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","KOR","USA","SWE","AUT","CHE","DEU","FRA","DZA","IRN","CAN","PRT","ISR","RUS","NOR","AUS","DNK","CHL","CZE","JPN","UKR","MAR","ARG")
 # training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","HUB","KOR","USA","SWE","AUT","CHE","DEU","FRA","DZA","IRN","CAN","TUR","BEL","ANT","PRT","ISR","RUS","NOR","IRL","AUS","IND","DNK","CHL","CZE","JPN","UKR","MAR","ARG","SGP","ROU")
-training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","KOR","USA","SWE","AUT","CHE","DEU","FRA","DZA","IRN","CAN","TUR","BEL","ANT","PRT","ISR","RUS","NOR","IRL","AUS","IND","DNK","CHL","CZE","JPN","UKR","MAR","ARG","SGP","ROU")
+training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","KOR","USA","SWE","AUT","CHE","DEU","FRA","DZA","IRN","CAN","TUR","BEL","ANT","PRT","ISR","RUS","NOR","IRL","AUS","IND","DNK","CHL","CZE","JPN","UKR","MAR","ARG","ROU")
 
 training_countries <- training_countries_all[which(training_countries_all != testing_countries)]
 
 #---Estimating reproduction numbers, R0---#########################################################################################################################################################################
 library(tidyverse)
-#"SI for Serial Intervals.
-# Determination of the serial interval, the time between the start of symptoms in the primary patient (infector) 
+# We are using the epiestim package to calculate the R0 for countries. This requires two things
+# 1. specific information about the serial intervals for COVID
+# 2. the timeseries incidence data.
+# "SI for Serial Intervals.
+# Determination of the serial interval, the time between the start of symptoms in the primary patient (infector)
 # and onset of symptoms in the patient receiving that infection from the infector (the infectee)"
 # Table 1 from https://www.medrxiv.org/content/10.1101/2020.04.13.20062760v1
-#"we calculate a weighted mean of the published parameters and inferred a serial interval described 
-# by a gamma distribution, parameterised with mean SI of 4.56 days (credible interval: 2.54 - 7.36) 
+# "we calculate a weighted mean of the published parameters and inferred a serial interval described
+# by a gamma distribution, parameterised with mean SI of 4.56 days (credible interval: 2.54 - 7.36)
 # and standard deviation 4.53 days (credible interval 4.17 - 5.05)."
 
 serialIntervals = tibble(
@@ -440,8 +457,33 @@ for(i in 1:length(training_countries)){
   
   training_subset_aligned <- training_subset[start:nrow(training_subset),]
   training_subset_aligned$time <- c(1:nrow(training_subset_aligned))
+  
+  # Smooth out incidence using moving average with a centered window of 7 datapoints (3 to the left, 3 to the right)
+  # make sure the window is an odd integer
+  window <- 7
+  # dim(training_subset_aligned)
+  # length(rollmean(training_subset_aligned$confirmed_cum_per_million, k=window))
+  training_subset_aligned$movingAverage <- c(training_subset_aligned$confirmed_cum_per_million[1:((window-1)/2)],rollmean(training_subset_aligned$confirmed_cum_per_million, k=window, align = "center"),training_subset_aligned$confirmed_cum_per_million[(nrow(training_subset_aligned)-((window-1)/2)+1):nrow(training_subset_aligned)])
+  # Plot cases
+  gg <- ggplot(training_subset_aligned) +
+    geom_line(aes(x=date, y=confirmed_cum_per_million),color="red") +
+    geom_line(aes(x=date, y=movingAverage),color="blue") +
+    ggtitle(paste0("Reported cases in ", training_countries[i]))
+  print(gg)
+  # Add moving average day lag and one day difference variables
+  training_subset_aligned[["movingAverage_Lag_1"]] <- lag(training_subset_aligned[["movingAverage"]],1)
+  training_subset_aligned[["movingAverage_Lag_3"]] <- lag(training_subset_aligned[["movingAverage"]],3)
+  training_subset_aligned[["movingAverage_Lag_7"]] <- lag(training_subset_aligned[["movingAverage"]],7)
+  training_subset_aligned[["movingAverage_Lag_14"]] <- lag(training_subset_aligned[["movingAverage"]],14)
+  training_subset_aligned[["movingAverage_diff_1_3"]] <- training_subset_aligned[["movingAverage_Lag_1"]] - training_subset_aligned[["movingAverage_Lag_3"]]
+  training_subset_aligned[["movingAverage_diff_1_7"]] <- training_subset_aligned[["movingAverage_Lag_1"]] - training_subset_aligned[["movingAverage_Lag_7"]]
+  training_subset_aligned[["movingAverage_diff_1_14"]] <- training_subset_aligned[["movingAverage_Lag_1"]] - training_subset_aligned[["movingAverage_Lag_14"]]
+  training_subset_aligned[["movingAverage_diff_3_7"]] <- training_subset_aligned[["movingAverage_Lag_3"]] - training_subset_aligned[["movingAverage_Lag_7"]]
+  training_subset_aligned[["movingAverage_diff_7_14"]] <- training_subset_aligned[["movingAverage_Lag_7"]] - training_subset_aligned[["movingAverage_Lag_14"]]
 
-  toCalcR0 <- training_subset_aligned[,c("date","confirmed")]
+  
+  # toCalcR0 <- training_subset_aligned[,c("date","confirmed")]
+  toCalcR0 <- training_subset_aligned[,c("date","movingAverage")]
   colnames(toCalcR0) <- c("dates","I")
   toCalcR0$I[toCalcR0$I<0] <- NA
   #Get of erroneous negative counts... they sneak throught the API sometimes. 
@@ -498,10 +540,33 @@ for(i in 1:length(testing_countries)){
   }
   testing_subset_aligned <- testing_subset[start:nrow(testing_subset),]
   
-  toCalcR0 <- testing_subset_aligned[,c("date","confirmed")]
+  # Smooth out incidence using moving average with a centered window of 7 datapoints (3 to the left, 3 to the right)
+  # make sure the window is an odd integer
+  window <- 7
+  # dim(testing_subset_aligned)
+  # length(rollmean(testing_subset_aligned$confirmed_cum_per_million, k=window))
+  testing_subset_aligned$movingAverage <- c(testing_subset_aligned$confirmed_cum_per_million[1:((window-1)/2)],rollmean(testing_subset_aligned$confirmed_cum_per_million, k=window, align = "center"),testing_subset_aligned$confirmed_cum_per_million[(nrow(testing_subset_aligned)-((window-1)/2)+1):nrow(testing_subset_aligned)])
+  # Plot cases
+  gg <- ggplot(testing_subset_aligned) +
+    geom_line(aes(x=date, y=confirmed_cum_per_million),color="red") +
+    geom_line(aes(x=date, y=movingAverage),color="blue") +
+    ggtitle(paste0("Reported cases in ", training_countries[i]))
+  print(gg)
+  # Add moving average day lag and one day difference variables
+  testing_subset_aligned[["movingAverage_Lag_1"]] <- lag(testing_subset_aligned[["movingAverage"]],1)
+  testing_subset_aligned[["movingAverage_Lag_3"]] <- lag(testing_subset_aligned[["movingAverage"]],3)
+  testing_subset_aligned[["movingAverage_Lag_7"]] <- lag(testing_subset_aligned[["movingAverage"]],7)
+  testing_subset_aligned[["movingAverage_Lag_14"]] <- lag(testing_subset_aligned[["movingAverage"]],14)
+  testing_subset_aligned[["movingAverage_diff_1_3"]] <- testing_subset_aligned[["movingAverage_Lag_1"]] - testing_subset_aligned[["movingAverage_Lag_3"]]
+  testing_subset_aligned[["movingAverage_diff_1_7"]] <- testing_subset_aligned[["movingAverage_Lag_1"]] - testing_subset_aligned[["movingAverage_Lag_7"]]
+  testing_subset_aligned[["movingAverage_diff_1_14"]] <- testing_subset_aligned[["movingAverage_Lag_1"]] - testing_subset_aligned[["movingAverage_Lag_14"]]
+  testing_subset_aligned[["movingAverage_diff_3_7"]] <- testing_subset_aligned[["movingAverage_Lag_3"]] - testing_subset_aligned[["movingAverage_Lag_7"]]
+  testing_subset_aligned[["movingAverage_diff_7_14"]] <- testing_subset_aligned[["movingAverage_Lag_7"]] - testing_subset_aligned[["movingAverage_Lag_14"]]
+  
+  # toCalcR0 <- testing_subset_aligned[,c("date","confirmed")]
+  toCalcR0 <- testing_subset_aligned[,c("date","movingAverage")]
   colnames(toCalcR0) <- c("dates","I")
   toCalcR0$I[toCalcR0$I<0] <- NA
-  #Get of erroneous negative counts... they sneak throught the API sometimes. 
   #Get of erroneous negative counts... they sneak throught the API sometimes. 
   # But if thre is a negative at teh end... are the last one lets just make it equal to the n-1 one
   if(is.na(tail(toCalcR0$I,1))){
@@ -534,7 +599,7 @@ for(i in 1:length(testing_countries)){
   plot(res_uncertain_si, legend = T)
   mtext(training_countries[i], outer=TRUE,  cex=1, line=-.5)
   
-  tmp <- testing_subset_aligned[1:projectionTime,]
+  tmp <- testing_subset_aligned[1:forecastingTime,]
   tmp[,grep("cum|Social_Distancing|Quaranting_Cases|Close_Border|Google|R0|date|confirmed", colnames(tmp))] <- NA
   tmp$Social_Distancing <- NA
   tmp$Quaranting_Cases <- NA
@@ -550,9 +615,10 @@ for(i in 1:length(testing_countries)){
 }
 dev.off()
 
+# preserve the original dataframes before we make changes to them...
 testing_ready_OG <- testing_ready
 training_ready_OG <- training_ready
-# Let's use some of the country's data for training
+# Let's use some of the country's data for training based on testingTimeFrame
 NrowToSaveForTesting <- round(nrow(testing_ready_OG)*testingTimeFrame)
 breakpoint <- nrow(testing_ready_OG)-NrowToSaveForTesting
 testing_ready <- testing_ready_OG[(breakpoint+1):nrow(testing_ready_OG),]
@@ -571,35 +637,9 @@ if(incidence_flag==T && death_flag==F){
   testing_ready$lag_01_cut <- as.numeric(cut(testing_ready$confirmed_cum_per_million_lag_01, breaks = myBreaks,
                                   include.lowest = T, right = TRUE, dig.lab = 3,
                                   ordered_result = T))
-}else if(incidence_flag==T && death_flag==T){
-  #   # geom_line(data=testing_ready, aes(x = time, y = death_cum_per_million, group = FullName, color = FullName), size=1, linetype = "3313",alpha=1)+
-  myBreaks <- quantile(training_ready$death_cum_per_million_lag_01,seq(0, 1, by= 0.03))
-  training_ready$lag_01_cut <- as.numeric(cut(training_ready$death_cum_per_million_lag_01, breaks = myBreaks,
-                                   include.lowest = T, right = TRUE, dig.lab = 3,
-                                   ordered_result = T))
-  testing_ready$lag_01_cut <- as.numeric(cut(testing_ready$death_cum_per_million_lag_01, breaks = myBreaks,
-                                  include.lowest = T, right = TRUE, dig.lab = 3,
-                                  ordered_result = T))
-}else if(incidence_flag==F && death_flag==F){
-  #   geom_line(data=training_ready, aes(x = time, y = confirmed_cum, group = FullName, color = FullName), size=0.8,alpha=.7)+
-  myBreaks <- quantile(training_ready$confirmed_cum_lag_01,seq(0, 1, by= 0.03))
-  training_ready$lag_01_cut <- as.numeric(cut(training_ready$confirmed_cum_lag_01, breaks = myBreaks,
-                                   include.lowest = T, right = TRUE, dig.lab = 3,
-                                   ordered_result = T))
-  testing_ready$lag_01_cut <- as.numeric(cut(testing_ready$confirmed_cum_lag_01, breaks = myBreaks,
-                                  include.lowest = T, right = TRUE, dig.lab = 3,
-                                  ordered_result = T))
-}else if(incidence_flag==F && death_flag==T){
-  #   geom_line(data=training_ready, aes(x = time, y = death_cum, group = FullName, color = FullName), size=0.8,alpha=.7)+
-  myBreaks <- quantile(training_ready$death_cum_lag_01,seq(0, 1, by= 0.03))
-  training_ready$lag_01_cut <- as.numeric(cut(training_ready$death_cum_lag_01, breaks = myBreaks,
-                                   include.lowest = T, right = TRUE, dig.lab = 3,
-                                   ordered_result = T))
-  testing_ready$lag_01_cut <- as.numeric(cut(testing_ready$death_cum_lag_01, breaks = myBreaks,
-                                  include.lowest = T, right = TRUE, dig.lab = 3,
-                                  ordered_result = T))
+  # Make moving average variable our outcome variable
+  training_ready$confirmed_cum_per_million <- as.numeric(training_ready$movingAverage)
 }
-
 
 
 #---NPIflag1---#########################################################################################################################################################################
@@ -671,7 +711,7 @@ if(incidence_flag==T && death_flag==F){
     # geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size = 3, colour = 'red', alpha = 0.1) +
     # geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size = 2, colour = 'red', alpha = 0.2) +
     # geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size = 1, colour = 'red', alpha = 0.5) +
-    # geom_glowing_line(aes(x = testing_ready$time[1:(nrow(testing_ready)-projectionTime)], y = testing_ready$confirmed_cum_per_million[1:(nrow(testing_ready)-projectionTime)], color = FullName), alpha = 1, size = 1, glow_alpha = 0.03)+
+    # geom_glowing_line(aes(x = testing_ready$time[1:(nrow(testing_ready)-forecastingTime)], y = testing_ready$confirmed_cum_per_million[1:(nrow(testing_ready)-forecastingTime)], color = FullName), alpha = 1, size = 1, glow_alpha = 0.03)+
     # geom_glowing_line(aes(x = training_ready$time, y = training_ready$confirmed_cum_per_million, color = FullName, fill = FullName), alpha = 1, size = 1, glow_alpha = 0.03)+
   plot1 <- testing_ready_OG %>%
     ggplot(aes(x = time, y = confirmed_cum_per_million, color = FullName))+
@@ -745,7 +785,7 @@ if(incidence_flag==T && death_flag==F){
   # geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size = 3, colour = 'red', alpha = 0.1) +
   # geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size = 2, colour = 'red', alpha = 0.2) +
   # geom_line(data=testing_ready, aes(x = time, y = confirmed_cum_per_million, group = FullName, color = FullName), size = 1, colour = 'red', alpha = 0.5) +
-  # geom_glowing_line(aes(x = testing_ready$time[1:(nrow(testing_ready)-projectionTime)], y = testing_ready$confirmed_cum_per_million[1:(nrow(testing_ready)-projectionTime)], color = FullName), alpha = 1, size = 1, glow_alpha = 0.03)+
+  # geom_glowing_line(aes(x = testing_ready$time[1:(nrow(testing_ready)-forecastingTime)], y = testing_ready$confirmed_cum_per_million[1:(nrow(testing_ready)-forecastingTime)], color = FullName), alpha = 1, size = 1, glow_alpha = 0.03)+
   # geom_glowing_line(aes(x = training_ready$time, y = training_ready$confirmed_cum_per_million, color = FullName, fill = FullName), alpha = 1, size = 1, glow_alpha = 0.03)+
   plot2 <- testing_ready_OG %>%
     ggplot(aes(x = time, y = R0, color = FullName))+
@@ -814,7 +854,7 @@ plot2 <- plot2 +
 
 #---third and fourth plots---#########################################################################################################################################################################
 # lineColors <- c("firebrick","darkgoldenrod1", "darkviolet", "limegreen", "dodgerblue")
-plot34Data <- testing_ready_OG[1:(nrow(testing_ready_OG)-projectionTime),c("date","R0","Social_Distancing","Quaranting_Cases","Close_Border","Google_Grocery_pharmacy","Google_Parks","Google_Residential","Google_Retail_recreation","Google_Transit_stations","Google_Workplaces")]
+plot34Data <- testing_ready_OG[1:(nrow(testing_ready_OG)-forecastingTime),c("date","R0","Social_Distancing","Quaranting_Cases","Close_Border","Google_Grocery_pharmacy","Google_Parks","Google_Residential","Google_Retail_recreation","Google_Transit_stations","Google_Workplaces")]
 plot34Data <- plot34Data %>% gather(key,value,-date)
 # plot34Data$date <- as.date(plot34Data$date)
 plot34Data$key <- as.factor(plot34Data$key)
@@ -850,7 +890,7 @@ plot3 <- plot3 +
 # plot4Data <- subset(plot34Data, key %in% c("R0","Social_Distancing","Quaranting_Cases","Close_Border"))
 plot4Data$date <- as.Date(plot4Data$date)
 plot4Data$key <- factor(plot4Data$key, levels = c("Social_Distancing", "Quaranting_Cases", "Close_Border", "R0"), ordered = T)
-plot4 <- ggplot() 
+# plot4 <- ggplot() 
 plot4_NPI <- subset(plot4Data, key %ni% c("R0"))
 plot4_NPI$key <- factor(plot4_NPI$key, levels = c("Social_Distancing", "Quaranting_Cases", "Close_Border", "R0"), ordered = T)
 plot4_R0 <- subset(plot4Data, key %in% c("R0"))
@@ -1015,7 +1055,7 @@ if(death_flag==F){
 # NPIflag2 <- "lastNPI"
 testing_ready_pred <- testing_ready_sub2
 
-breaker <- nrow(testing_ready_pred)-projectionTime+1
+breaker <- nrow(testing_ready_pred)-forecastingTime+1
 # testing_ready_pred[(breaker-1):(breaker+1),grep("confirmed_cum_per_million", colnames(testing_ready_pred))]
 
 # Note this code assumes that there are no NAs present in the NPI data
@@ -1036,8 +1076,11 @@ if(NPIflag2 == "lastNPI"){
 
 
 #---makePrediction---#########################################################################################################################################################################
-# p1 <- predict(best_model, testing_ready_pred[1:(breaker-1),], na.action = na.pass, n.trees = number_trees)
-p1 <- predictFunction(name=best_model, mod_name=model_name,dd=testing_ready_pred[1:(breaker-1),], n_trees = number_trees)
+p1 <- predict(best_model, testing_ready_pred[1:(breaker-1),], na.action = na.pass, n.trees = 1000)
+
+# p1_tmp <- predictFunction(name=best_model, mod_name=model_name,dd=testing_ready_pred[1:(breaker-1),], n_trees = number_trees)
+# p1 <- as.data.frame(cbind(p1_tmp$predictions,p1_tmp$se))
+# colnames(p1) <- c("prediction","se")
 for(i in breaker:nrow(testing_ready_pred)){
   for(l in 1:nLags){
     if(l==1){
@@ -1049,7 +1092,28 @@ for(i in breaker:nrow(testing_ready_pred)){
           testing_ready_pred[i,c(paste0("lag_01_cut"))] <- as.numeric(cut(testing_ready_pred[i-1,c(paste0("confirmed_cum_per_million"))], breaks = myBreaks,
                                                                           include.lowest = T, right = TRUE, dig.lab = 3,
                                                                           ordered_result = T))        
-          }
+        }
+        if("movingAverage_diff_1_3" %in% colnames(testing_ready_pred)){
+          testing_ready_pred[i,c(paste0("movingAverage_diff_1_3"))] <- testing_ready_pred[(i-1),c(paste0("confirmed_cum_per_million"))] - testing_ready_pred[(i-3),c(paste0("confirmed_cum_per_million"))]   
+        }
+        if("movingAverage_diff_1_7" %in% colnames(testing_ready_pred)){
+          testing_ready_pred[i,c(paste0("movingAverage_diff_1_7"))] <- testing_ready_pred[(i-1),c(paste0("confirmed_cum_per_million"))] - testing_ready_pred[(i-7),c(paste0("confirmed_cum_per_million"))]   
+        }
+        if("movingAverage_diff_1_14" %in% colnames(testing_ready_pred)){
+          testing_ready_pred[i,c(paste0("movingAverage_diff_1_14"))] <- testing_ready_pred[(i-1),c(paste0("confirmed_cum_per_million"))] - testing_ready_pred[(i-14),c(paste0("confirmed_cum_per_million"))]   
+        }
+        if("movingAverage_diff_3_7" %in% colnames(testing_ready_pred)){
+          testing_ready_pred[i,c(paste0("movingAverage_diff_3_7"))] <- testing_ready_pred[(i-3),c(paste0("confirmed_cum_per_million"))] - testing_ready_pred[(i-7),c(paste0("confirmed_cum_per_million"))]   
+        }
+        if("movingAverage_diff_7_14" %in% colnames(testing_ready_pred)){
+          testing_ready_pred[i,c(paste0("movingAverage_diff_7_14"))] <- testing_ready_pred[(i-7),c(paste0("confirmed_cum_per_million"))] - testing_ready_pred[(i-14),c(paste0("confirmed_cum_per_million"))]   
+        }
+        if("movingAverage_Lag_1" %in% colnames(testing_ready_pred)){
+          testing_ready_pred[i,c(paste0("movingAverage_Lag_1"))] <- testing_ready_pred[(i-1),c(paste0("confirmed_cum_per_million"))]
+        }
+        if("movingAverage_Lag_5" %in% colnames(testing_ready_pred)){
+          testing_ready_pred[i,c(paste0("movingAverage_Lag_5"))] <- testing_ready_pred[(i-5),c(paste0("confirmed_cum_per_million"))]
+        }
       }else if(incidence_flag==T && death_flag==T){
         testing_ready_pred[i,c(paste0("death_cum_per_million_lag_01"))] <- testing_ready_pred[i-1,c(paste0("death_cum_per_million"))]
       }else if(incidence_flag==F && death_flag==F){
@@ -1185,7 +1249,7 @@ plot_predict <- plot_predict +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
         panel.background = element_blank(), axis.line = element_line(colour = "black"))+
   labs(x=NULL)
-plot_predict
+# plot_predict
 
 #---variableImportancePlot---#########################################################################################################################################################################
 
@@ -1236,7 +1300,7 @@ plot_varimp <- ggplot2::ggplot(df2) +
 theme_bw()
 
 #---cumulativePlot---#########################################################################################################################################################################
-rmsedf <- plot1Data[(breakpoint+1):(nrow(plot1Data)-projectionTime),]
+rmsedf <- plot1Data[(breakpoint+1):(nrow(plot1Data)-forecastingTime),]
 rmse_val <- sqrt( sum( (rmsedf$Prediction - rmsedf$Actual)^2 ,na.rm = T) / (nrow(rmsedf)) )
 rmse_val <- round(rmse_val,3)
 gl <- list(plot1,plot2,plot_predict,plot_varimp,plot3,plot4)
