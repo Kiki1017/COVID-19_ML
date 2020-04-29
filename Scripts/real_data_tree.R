@@ -30,6 +30,7 @@ library(ggCyberPunk)
 library(corrplot)
 # library(ranger)
 # library(earth)
+library(VSURF)
 '%ni%' <- Negate('%in%')
 
 #---randomForestFunction---#########################################################################################################################################################################
@@ -923,6 +924,53 @@ plot4 <- plot4 +
 
 # plot3
 # plot4
+
+#---VSURF - variable selection---#########################################################################################################################################################################
+# Using the methodology of VSURF to identify what variables are important in the analysis.
+VSURF_flag = TRUE
+if(VSURF_flag == TRUE){
+  # look at training data
+  glimpse(training_ready)
+  
+  # filter training data
+  training_ready_sub2 <- training_ready %>%
+    select(which(colnames(training_ready) %ni% listToRemove)) %>%
+    select(-contains("death_cum")) %>%
+    select(-contains("MalePercent")) %>%
+    select(-contains("FemalePercent")) %>%
+    select(-c(confirmed_cum, Percent_house_Multi_generation,Percent_house_Three_generation,Percent_house_Skip_generation,Num_Tests_cum)) %>%
+    select(-contains("movingAverage")) %>%
+    mutate_if(is.factor,as.character) %>%
+    mutate_if(is.character,as.numeric) %>%
+    mutate_if(is.integer,as.numeric)
+    # select(-contains(c("million_lag")))
+    
+  glimpse(training_ready_sub2)
+  
+  # Run VSURF
+  results.vsurf <- VSURF(confirmed_cum_per_million ~., data = training_ready_sub2,
+                         na.action = na.omit, mtry = 100, n_tree = number_trees, parallel = TRUE, ncores = 7)
+  
+  # look at results of VSURF
+  summary(results.vsurf)
+  plot(results.vsurf)
+  results.vsurf$varselect.thres
+  results.vsurf$varselect.interp
+  results.vsurf$varselect.pred
+  
+  # print the reduced number of variables that should be considered in model
+  colnames(training_ready_sub2[,results.vsurf$varselect.thres])
+  colnames(training_ready_sub2[,results.vsurf$varselect.interp])
+  colnames(training_ready_sub2[,results.vsurf$varselect.pred])    # The final list of variables to be included according to the VSURF methodology.
+  
+  # dataframe with reduced number of variables
+  training_ready_sub_vsurf_result = select(training_ready_sub2, c(confirmed_cum_per_million, colnames(training_ready_sub2[,results.vsurf$varselect.pred])))
+  glimpse(training_ready_sub_vsurf_result)
+  
+}
+
+
+
 #---tree_Models---#########################################################################################################################################################################
 str(training_ready)
 str(testing_ready)
