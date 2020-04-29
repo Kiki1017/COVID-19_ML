@@ -963,10 +963,15 @@ if(VSURF_flag == TRUE){
   colnames(training_ready_sub2[,results.vsurf$varselect.interp])
   colnames(training_ready_sub2[,results.vsurf$varselect.pred])    # The final list of variables to be included according to the VSURF methodology.
   
-  # dataframe with reduced number of variables
+  # training dataframe with reduced number of variables
   training_ready_sub_vsurf_result = select(training_ready_sub2, c(confirmed_cum_per_million, colnames(training_ready_sub2[,results.vsurf$varselect.pred])))
   glimpse(training_ready_sub_vsurf_result)
   
+  # testing dataframe with reduced number of variables
+  testing_ready_sub_vsurf_result = select(testing_ready, c(confirmed_cum_per_million, colnames(training_ready_sub2[,results.vsurf$varselect.pred])))
+  glimpse(testing_ready_sub_vsurf_result)
+  
+
 }
 
 
@@ -1006,9 +1011,15 @@ if(death_flag==F){
       # testing_ready_sub2 %<>% mutate_if(is.character,as.numeric)
       # testing_ready_sub2 %<>% mutate_if(is.integer,as.numeric)
       # testing_ready_sub2$lag_01_cut <- testing_ready$lag_01_cut
+      training_ready_sub_vsurf_result
       caretRun <- caretFunction(name="confirmed_cum_per_million",dd=training_ready_sub2,n_trees = number_trees,gbm_flag=gbm_flag, bayesglm_flag=bayesglm_flag, gam_flag=gam_flag, glm_flag=glm_flag, rf_flag=rf_flag, all_flag=all_flag)
       best_model <- caretRun[["best_model_tmp"]]
       model_name <- caretRun[["model_name_tmp"]]
+      if(VSURF_flag=TRUE){
+        caretRun <- caretFunction(name="confirmed_cum_per_million",dd=training_ready_sub_vsurf_result,n_trees = number_trees,gbm_flag=gbm_flag, bayesglm_flag=bayesglm_flag, gam_flag=gam_flag, glm_flag=glm_flag, rf_flag=rf_flag, all_flag=all_flag)
+        best_model <- caretRun[["best_model_tmp"]]
+        model_name <- caretRun[["model_name_tmp"]]
+      }
     }
     else{
       best_model <- randomForestFunction(name="confirmed_cum_per_million",dd=training_ready_sub2)
@@ -1102,6 +1113,10 @@ if(death_flag==F){
 # setting the NPIflag2 to "lastNPI" is our method of saying that we want to fill all the NAs in the forecasting period with the last empirical time points' NPI values
 # NPIflag2 <- "lastNPI"
 testing_ready_pred <- testing_ready_sub2
+
+if(VSURF_flag==TRUE){
+  testing_ready_pred <- testing_ready_sub_vsurf_result
+}
 
 breaker <- nrow(testing_ready_pred)-forecastingTime+1
 # testing_ready_pred[(breaker-1):(breaker+1),grep("confirmed_cum_per_million", colnames(testing_ready_pred))]
@@ -1353,7 +1368,7 @@ rmse_val <- sqrt( sum( (rmsedf$Prediction - rmsedf$Actual)^2 ,na.rm = T) / (nrow
 rmse_val <- round(rmse_val,3)
 gl <- list(plot1,plot2,plot_predict,plot_varimp,plot3,plot4)
 pdf("finalPlot.pdf",width = 24, height = 24)
-grid.arrange(grobs = gl, top = textGrob(paste0(testing_ready$FullName[1]," ",model_name," RMSE = ",rmse_val), gp=gpar(fontsize=20)), layout_matrix = rbind(c(1,1,1,1,1,4,4,4),
+grid.arrange(grobs = gl, top = textGrob(paste0(testing_ready$FullName[1]," ",model_name," RMSE = ",rmse_val),gp=gpar(fontsize=20)), layout_matrix = rbind(c(1,1,1,1,1,4,4,4),
                                                                                                                                                            c(1,1,1,1,1,4,4,4),
                                                                                                                                                            c(1,1,1,1,1,4,4,4),
                                                                                                                                                            c(1,1,1,1,1,4,4,4),
