@@ -72,8 +72,8 @@ country_timeseries <- function(df, country, incidence=T, plot=F){
     ungroup()
   if(incidence==T){
     output <- output %>%
-      # mutate(confirmed_cum_per_million = cumsum(confirmed) / (pop/1000000)) %>%
-      mutate(confirmed_cum_per_million = confirmed / (pop/1000000)) %>%
+      mutate(confirmed_cum_per_million = cumsum(confirmed) / (pop/1000000)) %>%
+      # mutate(confirmed_cum_per_million = confirmed / (pop/1000000)) %>%
       mutate(death_cum_per_million = cumsum(death) / (pop/1000000)) %>%
       mutate(confirmed_cum = cumsum(confirmed)) %>%
       mutate(death_cum = cumsum(death))

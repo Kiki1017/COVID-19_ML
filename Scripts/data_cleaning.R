@@ -96,16 +96,16 @@ for(i in 1:length(npi_countries)){
   npi_df_i <- read_sheet(ugly_url, sheet = npi_countries[i]) %>%
     mutate(date = ymd(date)) %>%
     # add lag factors
-    mutate(Social_Distancing_Lag_3 = lag(Social_Distancing, n=3)) %>%
-    mutate(Social_Distancing_Lag_7 = lag(Social_Distancing, n=7)) %>%
+    mutate(Social_Distancing_Lag_03 = lag(Social_Distancing, n=3)) %>%
+    mutate(Social_Distancing_Lag_07 = lag(Social_Distancing, n=7)) %>%
     mutate(Social_Distancing_Lag_10 = lag(Social_Distancing, n=10)) %>%
     mutate(Social_Distancing_Lag_14 = lag(Social_Distancing, n=14)) %>%
-    mutate(Quaranting_Cases_Lag_3 = lag(Quaranting_Cases, n=3)) %>%
-    mutate(Quaranting_Cases_Lag_7 = lag(Quaranting_Cases, n=7)) %>%
+    mutate(Quaranting_Cases_Lag_03 = lag(Quaranting_Cases, n=3)) %>%
+    mutate(Quaranting_Cases_Lag_07 = lag(Quaranting_Cases, n=7)) %>%
     mutate(Quaranting_Cases_Lag_10 = lag(Quaranting_Cases, n=10)) %>%
     mutate(Quaranting_Cases_Lag_14 = lag(Quaranting_Cases, n=14)) %>%
-    mutate(Close_Border_Lag_3 = lag(Close_Border, n=3)) %>%
-    mutate(Close_Border_Lag_7 = lag(Close_Border, n=7)) %>%
+    mutate(Close_Border_Lag_03 = lag(Close_Border, n=3)) %>%
+    mutate(Close_Border_Lag_07 = lag(Close_Border, n=7)) %>%
     mutate(Close_Border_Lag_10 = lag(Close_Border, n=10)) %>%
     mutate(Close_Border_Lag_14 = lag(Close_Border, n=14))
   data_npi <- bind_rows(data_npi,npi_df_i)
