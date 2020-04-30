@@ -1322,7 +1322,7 @@ NPIplotAnimation <- function(myNPI = npiList[1], myDate = "2020-03-28"){
     }
   }
   
-  title_paste <- paste0(simpleCap(paste(unlist(strsplit(myNPI,"_")), sep=" ", collapse=" "))," Density Plots by Country")
+  title_paste <- paste0(simpleCap(paste(unlist(strsplit(myNPI,"_")), sep=" ", collapse=" "))," Density")
   
   gl <- list(npi5)
   grid.arrange(grobs = gl, 
