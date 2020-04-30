@@ -18,6 +18,7 @@ library(corrplot)
 library(gridExtra)
 library(grid)
 library(ggpubr)
+library(ggridges)
 '%ni%' <- Negate('%in%')
 
 #---Flag setup---#########################################################################################################################################################################
@@ -63,7 +64,8 @@ summary(data_clean)
 
 # testing_countriesList <- c("USA","BRA","GBR","ZAF","BEL","DZA")
 testing_countriesList <- c("USA")
-for(cc in 1:length(testing_countriesList)){
+# for(cc in 1:length(testing_countriesList)){
+cc=1
   
     
   # Choose the testing country
@@ -931,17 +933,17 @@ for(cc in 1:length(testing_countriesList)){
   # plot(best_model)
   # 
   
-  
-  # --- Output variables for RShiny App -----
+  #---Output variables for RShiny App---#########################################################################################################################################################################
+
   # Saving on object in RData format
   save(plot1, plot_predict, plot2, plot3, plot4, best_model,  file = paste0("./COVID-19_Shiny_Web_App/Inputs/",testing_countries[1],"_CaseIncidence_Data.RData") )
   
 
-}
+# }
 
 pdf(paste0("./Output_CaseIncidence/npicorrPlot_","CaseIncidence.pdf"),width = 12, height = 12)
 
-# --- Correlation between NPI data and google data -----
+#---Correlation between NPI data and google data---#########################################################################################################################################################################
 # look at the correlation matrix betweten the google mobility data and the data collected for NPIs
 # cerate dataframe
 NPI_google_df = tibble(data_clean[c("date", "ISO3","Google_Residential", "Google_Workplaces", "Google_Transit_stations",
@@ -960,8 +962,7 @@ NPI_corrplot <- corrplot(NPI_google_cor_mat, method="circle", type="upper")
 
 dev.off()
 
-# --- NPI Density Plots -----
-
+#---NPI Density Plots---#########################################################################################################################################################################
 training_manipulate <- training_ready_OG
 testing_manipulate <- testing_ready_OG
 
@@ -996,620 +997,368 @@ NPInames <- names(testing_manipulate)[grep("Social_Distancing|Quaranting_Cases|C
 # prevcountry <- testing_manipulate$Country.x[1]
 if(NPIflag1 == "autofill"){
   for(i in 2:nrow(testing_manipulate)){
-    # curcountry <- testing_manipulate$Country.x[i]
-    # if(curcountry == prevcountry){
-    #   counter <- counter+1
-    # }else{
-    #   counter <- 1
-    # }
-    
     for(j in NPInames){
       if(is.na(testing_manipulate[[j]][i])){
         testing_manipulate[[j]][i] <- testing_manipulate[[j]][i-1]
       }
     }
-    # prevcountry <- curcountry
   }
 }
 peek_at_NPIs_testing2 <- testing_manipulate[,c(c("date","time","Country.x","ISO3","confirmed","movingAverage"),names(testing_manipulate)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(testing_manipulate))])]
 
 
 
-both <- rbind(peek_at_NPIs_training2,peek_at_NPIs_testing2[1:(nrow(testing_ready_sub3-forecastingTime)),])
+both <- rbind(peek_at_NPIs_training2,peek_at_NPIs_testing2[1:(nrow(peek_at_NPIs_testing2-forecastingTime)),])
 npiDensityPlotData <- both[c("date", "Country.x","movingAverage","Google_Residential", "Google_Workplaces", "Google_Transit_stations",
                                    "Google_Parks", "Google_Grocery_pharmacy", "Google_Retail_recreation",
                                    "Social_Distancing", "Quaranting_Cases", "Close_Border")]
 
-pdf(paste0("./Output_CaseIncidence/npidensPlot_","CaseIncidence.pdf"),width = 25, height = 8)
+simpleCap <- function(x) {
+  s <- strsplit(x, " ")[[1]]
+  paste(toupper(substring(s, 1,1)), substring(s, 2),
+        sep="", collapse=" ")
+}
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+unlink(paste0("./Output_CaseIncidence/npidensPlot_","CaseIncidence.pdf"))
+pdf(paste0("./Output_CaseIncidence/npidensPlot_","CaseIncidence.pdf"),width = 28, height = 14)
 
 npiList <- c("Google_Residential", "Google_Workplaces", "Google_Transit_stations",
               "Google_Parks", "Google_Grocery_pharmacy", "Google_Retail_recreation",
               "Social_Distancing", "Quaranting_Cases", "Close_Border")
 
-dateRange <- seq(from=min(both$date,na.rm=T), to=max(both$date,na.rm=T), length.out = 5)
-myNPI <- npiList[1]
-
-startDate <- dateRange[1]
-endDate <- dateRange[3]
-bothSub <- subset(both,date<=endDate & date>=startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted1 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi1 <- ggplot(npiDensityPlotDataMelted1, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-startDate <- dateRange[3]
-endDate <- dateRange[4]
-bothSub <- subset(both,date<=endDate & date>startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted2 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi2 <- ggplot(npiDensityPlotDataMelted2, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-startDate <- dateRange[4]
-endDate <- dateRange[5]
-bothSub <- subset(both,date<=endDate & date>startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted3 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi3 <- ggplot(npiDensityPlotDataMelted3, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-# Make commmon axis
-minx <- min(both[[myNPI]],na.rm=T)
-maxx <- max(both[[myNPI]],na.rm=T)
-lowerRange <- minx-(maxx-minx)*.15
-upperRange <- maxx+(maxx-minx)*.15
-npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-
-
-gl <- list(npi1,npi2,npi3)
-grid.arrange(grobs = gl, 
-             top = textGrob(paste0(myNPI," Density by Country"),
-                            gp=gpar(fontsize=18)), 
-             layout_matrix = rbind( c(1,2,3)),
-             common.legend = TRUE, legend="bottom"
-)
+dateRange <- seq(from=min(both$date,na.rm=T), to=max(both$date,na.rm=T), length.out = 23)
+dateSplits <- seq(from=11, to=23, length.out = 4)
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
-myNPI <- npiList[2]
+NPIplotter <- function(myNPI = npiList[1]){
+  startDate <- dateRange[1]
+  endDate <- dateRange[dateSplits[1]]
+  bothSub <- subset(both,date<=endDate & date>=startDate)
+  npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
+  npiDensityPlotDataMelted1 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
+  npi1 <- ggplot(npiDensityPlotDataMelted1, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
+    geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
+    scale_y_discrete(expand = c(0.0005, 0)) +
+    scale_fill_viridis(name = "", option = "C") +
+    labs(title = paste0(format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d")),
+         subtitle = '')+
+    xlab(simpleCap(paste(unlist(strsplit(myNPI,"_")), sep=" ", collapse=" ")))+
+    theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
+  
+  startDate <- dateRange[dateSplits[1]]
+  endDate <- dateRange[dateSplits[2]]
+  bothSub <- subset(both,date<=endDate & date>startDate)
+  npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
+  npiDensityPlotDataMelted2 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
+  npi2 <- ggplot(npiDensityPlotDataMelted2, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
+    geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
+    scale_y_discrete(expand = c(0.0005, 0)) +
+    scale_fill_viridis(name = "", option = "C") +
+    labs(title = paste0(format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d")),
+         subtitle = '')+
+    xlab(simpleCap(paste(unlist(strsplit(myNPI,"_")), sep=" ", collapse=" ")))+
+    theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
+  
+  startDate <- dateRange[dateSplits[2]]
+  endDate <- dateRange[dateSplits[3]]
+  bothSub <- subset(both,date<=endDate & date>startDate)
+  npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
+  npiDensityPlotDataMelted3 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
+  npi3 <- ggplot(npiDensityPlotDataMelted3, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
+    geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
+    scale_y_discrete(expand = c(0.0005, 0)) +
+    scale_fill_viridis(name = "", option = "C") +
+    labs(title = paste0(format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d")),
+         subtitle = '')+
+    xlab(simpleCap(paste(unlist(strsplit(myNPI,"_")), sep=" ", collapse=" ")))+
+    theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
+  
+  startDate <- dateRange[dateSplits[3]]
+  endDate <- dateRange[dateSplits[4]]
+  bothSub <- subset(both,date<=endDate & date>=startDate)
+  npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
+  npiDensityPlotDataMelted4 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
+  npi4 <- ggplot(npiDensityPlotDataMelted4, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
+    geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
+    scale_y_discrete(expand = c(0.0005, 0)) +
+    scale_fill_viridis(name = "", option = "C") +
+    labs(title = paste0(format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d")),
+         subtitle = '')+
+    xlab(simpleCap(paste(unlist(strsplit(myNPI,"_")), sep=" ", collapse=" ")))+
+    theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
+  
+  # Make commmon axis
+  minx <- min(both[[myNPI]],na.rm=T)
+  maxx <- max(both[[myNPI]],na.rm=T)
+  lowerRange <- minx-(maxx-minx)*.15
+  upperRange <- maxx+(maxx-minx)*.15
+  outerBound <- c(abs(lowerRange),abs(upperRange))[which.max(c(abs(lowerRange),abs(upperRange)))]
+  if((upperRange-lowerRange)>10){
+    npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_viridis(alpha= 1, limits = c(-outerBound, outerBound), oob = scales::squish, name = "", option = "C")
+    npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_viridis(alpha= 1, limits = c(-outerBound, outerBound), oob = scales::squish, name = "", option = "C")
+    npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_viridis(alpha= 1, limits = c(-outerBound, outerBound), oob = scales::squish, name = "", option = "C")
+    npi4 <- npi4 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_viridis(alpha= 1, limits = c(-outerBound, outerBound), oob = scales::squish, name = "", option = "C")
+    }else{
+      if(myNPI == "Social_Distancing"){
+        npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(-4, 12), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
+        npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(-4, 12), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
+        npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(-4, 12), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
+        npi4 <- npi4 + scale_x_continuous(expand = c(0.01, 0), limits = c(-4, 12), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
+      }else{
+        npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(-2, 7.5), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
+        npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(-2, 7.5), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
+        npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(-2, 7.5), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
+        npi4 <- npi4 + scale_x_continuous(expand = c(0.01, 0), limits = c(-2, 7.5), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
+        
+      }
+    }
+  
+  title_paste <- paste0(simpleCap(paste(unlist(strsplit(myNPI,"_")), sep=" ", collapse=" "))," Density Plots by Country")
+  
+  gl <- list(npi1,npi2,npi3,npi4)
+  grid.arrange(grobs = gl, 
+               top = textGrob(title_paste, gp=gpar(fontsize=18)), 
+               layout_matrix = rbind( c(1,2,3,4)),
+               common.legend = TRUE, legend="bottom"
+  )
+}
 
-startDate <- dateRange[1]
-endDate <- dateRange[3]
-bothSub <- subset(both,date<=endDate & date>=startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted1 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi1 <- ggplot(npiDensityPlotDataMelted1, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
+# print(NPIplotter(myNPI = npiList[1]))
 
-startDate <- dateRange[3]
-endDate <- dateRange[4]
-bothSub <- subset(both,date<=endDate & date>startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted2 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi2 <- ggplot(npiDensityPlotDataMelted2, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
+for(n_n in 1:length(npiList)){
+# for(n_n in 7){
+  print(n_n)
+  print(npiList[n_n])
+  print(NPIplotter(myNPI = npiList[n_n]))
+}
 
-startDate <- dateRange[4]
-endDate <- dateRange[5]
-bothSub <- subset(both,date<=endDate & date>startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted3 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi3 <- ggplot(npiDensityPlotDataMelted3, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-# Make commmon axis
-minx <- min(both[[myNPI]],na.rm=T)
-maxx <- max(both[[myNPI]],na.rm=T)
-lowerRange <- minx-(maxx-minx)*.15
-upperRange <- maxx+(maxx-minx)*.15
-npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-
-
-gl <- list(npi1,npi2,npi3)
-grid.arrange(grobs = gl, 
-             top = textGrob(paste0(myNPI," Density by Country"),
-                            gp=gpar(fontsize=18)), 
-             layout_matrix = rbind( c(1,2,3)),
-             common.legend = TRUE, legend="bottom"
-)
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
-myNPI <- npiList[3]
 
-startDate <- dateRange[1]
-endDate <- dateRange[3]
-bothSub <- subset(both,date<=endDate & date>=startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted1 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi1 <- ggplot(npiDensityPlotDataMelted1, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-startDate <- dateRange[3]
-endDate <- dateRange[4]
-bothSub <- subset(both,date<=endDate & date>startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted2 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi2 <- ggplot(npiDensityPlotDataMelted2, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-startDate <- dateRange[4]
-endDate <- dateRange[5]
-bothSub <- subset(both,date<=endDate & date>startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted3 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi3 <- ggplot(npiDensityPlotDataMelted3, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-# Make commmon axis
-minx <- min(both[[myNPI]],na.rm=T)
-maxx <- max(both[[myNPI]],na.rm=T)
-lowerRange <- minx-(maxx-minx)*.15
-upperRange <- maxx+(maxx-minx)*.15
-npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-
-
-gl <- list(npi1,npi2,npi3)
-grid.arrange(grobs = gl, 
-             top = textGrob(paste0(myNPI," Density by Country"),
-                            gp=gpar(fontsize=18)), 
-             layout_matrix = rbind( c(1,2,3)),
-             common.legend = TRUE, legend="bottom"
-)
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
-myNPI <- npiList[4]
-
-startDate <- dateRange[1]
-endDate <- dateRange[3]
-bothSub <- subset(both,date<=endDate & date>=startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted1 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi1 <- ggplot(npiDensityPlotDataMelted1, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-startDate <- dateRange[3]
-endDate <- dateRange[4]
-bothSub <- subset(both,date<=endDate & date>startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted2 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi2 <- ggplot(npiDensityPlotDataMelted2, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-startDate <- dateRange[4]
-endDate <- dateRange[5]
-bothSub <- subset(both,date<=endDate & date>startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted3 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi3 <- ggplot(npiDensityPlotDataMelted3, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-# Make commmon axis
-minx <- min(both[[myNPI]],na.rm=T)
-maxx <- max(both[[myNPI]],na.rm=T)
-lowerRange <- minx-(maxx-minx)*.15
-upperRange <- maxx+(maxx-minx)*.15
-npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-
-
-gl <- list(npi1,npi2,npi3)
-grid.arrange(grobs = gl, 
-             top = textGrob(paste0(myNPI," Density by Country"),
-                            gp=gpar(fontsize=18)), 
-             layout_matrix = rbind( c(1,2,3)),
-             common.legend = TRUE, legend="bottom"
-)
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
-myNPI <- npiList[5]
-
-startDate <- dateRange[1]
-endDate <- dateRange[3]
-bothSub <- subset(both,date<=endDate & date>=startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted1 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi1 <- ggplot(npiDensityPlotDataMelted1, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-startDate <- dateRange[3]
-endDate <- dateRange[4]
-bothSub <- subset(both,date<=endDate & date>startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted2 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi2 <- ggplot(npiDensityPlotDataMelted2, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-startDate <- dateRange[4]
-endDate <- dateRange[5]
-bothSub <- subset(both,date<=endDate & date>startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted3 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi3 <- ggplot(npiDensityPlotDataMelted3, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-# Make commmon axis
-minx <- min(both[[myNPI]],na.rm=T)
-maxx <- max(both[[myNPI]],na.rm=T)
-lowerRange <- minx-(maxx-minx)*.15
-upperRange <- maxx+(maxx-minx)*.15
-npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-
-
-gl <- list(npi1,npi2,npi3)
-grid.arrange(grobs = gl, 
-             top = textGrob(paste0(myNPI," Density by Country"),
-                            gp=gpar(fontsize=18)), 
-             layout_matrix = rbind( c(1,2,3)),
-             common.legend = TRUE, legend="bottom"
-)
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
-myNPI <- npiList[6]
-
-startDate <- dateRange[1]
-endDate <- dateRange[3]
-bothSub <- subset(both,date<=endDate & date>=startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted1 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi1 <- ggplot(npiDensityPlotDataMelted1, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-startDate <- dateRange[3]
-endDate <- dateRange[4]
-bothSub <- subset(both,date<=endDate & date>startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted2 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi2 <- ggplot(npiDensityPlotDataMelted2, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-startDate <- dateRange[4]
-endDate <- dateRange[5]
-bothSub <- subset(both,date<=endDate & date>startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted3 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi3 <- ggplot(npiDensityPlotDataMelted3, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-# Make commmon axis
-minx <- min(both[[myNPI]],na.rm=T)
-maxx <- max(both[[myNPI]],na.rm=T)
-lowerRange <- minx-(maxx-minx)*.15
-upperRange <- maxx+(maxx-minx)*.15
-npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-
-
-gl <- list(npi1,npi2,npi3)
-grid.arrange(grobs = gl, 
-             top = textGrob(paste0(myNPI," Density by Country"),
-                            gp=gpar(fontsize=18)), 
-             layout_matrix = rbind( c(1,2,3)),
-             common.legend = TRUE, legend="bottom"
-)
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
-myNPI <- npiList[7]
-
-startDate <- dateRange[1]
-endDate <- dateRange[3]
-bothSub <- subset(both,date<=endDate & date>=startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted1 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi1 <- ggplot(npiDensityPlotDataMelted1, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-startDate <- dateRange[3]
-endDate <- dateRange[4]
-bothSub <- subset(both,date<=endDate & date>startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted2 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi2 <- ggplot(npiDensityPlotDataMelted2, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-startDate <- dateRange[4]
-endDate <- dateRange[5]
-bothSub <- subset(both,date<=endDate & date>startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted3 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi3 <- ggplot(npiDensityPlotDataMelted3, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-# Make commmon axis
-minx <- min(both[[myNPI]],na.rm=T)
-maxx <- max(both[[myNPI]],na.rm=T)
-lowerRange <- minx-(maxx-minx)*.15
-upperRange <- maxx+(maxx-minx)*.15
-npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-
-
-gl <- list(npi1,npi2,npi3)
-grid.arrange(grobs = gl, 
-             top = textGrob(paste0(myNPI," Density by Country"),
-                            gp=gpar(fontsize=18)), 
-             layout_matrix = rbind( c(1,2,3)),
-             common.legend = TRUE, legend="bottom"
-)
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
-myNPI <- npiList[8]
-
-startDate <- dateRange[1]
-endDate <- dateRange[3]
-bothSub <- subset(both,date<=endDate & date>=startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted1 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi1 <- ggplot(npiDensityPlotDataMelted1, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-startDate <- dateRange[3]
-endDate <- dateRange[4]
-bothSub <- subset(both,date<=endDate & date>startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted2 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi2 <- ggplot(npiDensityPlotDataMelted2, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-startDate <- dateRange[4]
-endDate <- dateRange[5]
-bothSub <- subset(both,date<=endDate & date>startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted3 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi3 <- ggplot(npiDensityPlotDataMelted3, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-# Make commmon axis
-minx <- min(both[[myNPI]],na.rm=T)
-maxx <- max(both[[myNPI]],na.rm=T)
-lowerRange <- minx-(maxx-minx)*.15
-upperRange <- maxx+(maxx-minx)*.15
-npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-
-
-gl <- list(npi1,npi2,npi3)
-grid.arrange(grobs = gl, 
-             top = textGrob(paste0(myNPI," Density by Country"),
-                            gp=gpar(fontsize=18)), 
-             layout_matrix = rbind( c(1,2,3)),
-             common.legend = TRUE, legend="bottom"
-)
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
-myNPI <- npiList[9]
-
-startDate <- dateRange[1]
-endDate <- dateRange[3]
-bothSub <- subset(both,date<=endDate & date>=startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted1 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi1 <- ggplot(npiDensityPlotDataMelted1, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-startDate <- dateRange[3]
-endDate <- dateRange[4]
-bothSub <- subset(both,date<=endDate & date>startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted2 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi2 <- ggplot(npiDensityPlotDataMelted2, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-startDate <- dateRange[4]
-endDate <- dateRange[5]
-bothSub <- subset(both,date<=endDate & date>startDate)
-npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
-npiDensityPlotDataMelted3 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
-npi3 <- ggplot(npiDensityPlotDataMelted3, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
-  # scale_x_continuous(expand = c(0.01, 0)) +
-  scale_y_discrete(expand = c(0.0005, 0)) +
-  scale_fill_viridis(name = "", option = "C") +
-  labs(title = '',
-       subtitle = paste0('2020 Dates: ',format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d"))) +
-  xlab(myNPI)+
-  theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
-
-# Make commmon axis
-minx <- min(both[[myNPI]],na.rm=T)
-maxx <- max(both[[myNPI]],na.rm=T)
-lowerRange <- minx-(maxx-minx)*.15
-upperRange <- maxx+(maxx-minx)*.15
-npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange))
-
-
-gl <- list(npi1,npi2,npi3)
-grid.arrange(grobs = gl, 
-             top = textGrob(paste0(myNPI," Density by Country"),
-                            gp=gpar(fontsize=18)), 
-             layout_matrix = rbind( c(1,2,3)),
-             common.legend = TRUE, legend="bottom"
-)
 dev.off()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#---NPI Density Animation---#########################################################################################################################################################################
+training_manipulate <- training_ready_OG
+testing_manipulate <- testing_ready_OG
+
+peek_at_NPIs_training1 <- training_manipulate[,c(c("date","time","Country.x","ISO3","confirmed","movingAverage"),names(training_manipulate)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(training_manipulate))])]
+NPInames <- names(training_manipulate)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(training_manipulate))]
+# View(training_manipulate[,c(NPInames)])
+counter <- 1
+prevcountry <- training_manipulate$Country.x[1]
+if(NPIflag1 == "autofill"){
+  for(i in 2:nrow(training_manipulate)){
+    curcountry <- training_manipulate$Country.x[i]
+    if(curcountry == prevcountry){
+      counter <- counter+1
+    }else{
+      counter <- 1
+    }
+    
+    for(j in NPInames){
+      if(is.na(training_manipulate[[j]][i]) && counter > 14){
+        training_manipulate[[j]][i] <- training_manipulate[[j]][i-1]
+      }
+    }
+    prevcountry <- curcountry
+  }
+}
+peek_at_NPIs_training2 <- training_manipulate[,c(c("date","time","Country.x","ISO3","confirmed","movingAverage"),names(training_manipulate)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(training_manipulate))])]
+
+
+peek_at_NPIs_testing1 <- testing_manipulate[,c(c("date","time","Country.x","ISO3","confirmed","movingAverage"),names(testing_manipulate)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(testing_manipulate))])]
+NPInames <- names(testing_manipulate)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(testing_manipulate))]
+# counter <- 1
+# prevcountry <- testing_manipulate$Country.x[1]
+if(NPIflag1 == "autofill"){
+  for(i in 2:nrow(testing_manipulate)){
+    for(j in NPInames){
+      if(is.na(testing_manipulate[[j]][i])){
+        testing_manipulate[[j]][i] <- testing_manipulate[[j]][i-1]
+      }
+    }
+  }
+}
+peek_at_NPIs_testing2 <- testing_manipulate[,c(c("date","time","Country.x","ISO3","confirmed","movingAverage"),names(testing_manipulate)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(testing_manipulate))])]
+
+
+
+both <- rbind(peek_at_NPIs_training2,peek_at_NPIs_testing2[1:(nrow(peek_at_NPIs_testing2-forecastingTime)),])
+npiDensityPlotData <- both[c("date", "Country.x","movingAverage","Google_Residential", "Google_Workplaces", "Google_Transit_stations",
+                             "Google_Parks", "Google_Grocery_pharmacy", "Google_Retail_recreation",
+                             "Social_Distancing", "Quaranting_Cases", "Close_Border")]
+
+simpleCap <- function(x) {
+  s <- strsplit(x, " ")[[1]]
+  paste(toupper(substring(s, 1,1)), substring(s, 2),
+        sep="", collapse=" ")
+}
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+unlink(paste0("./Output_CaseIncidence/npidensAnimation_","CaseIncidence.pdf"))
+pdf(paste0("./Output_CaseIncidence/npidensAnimation_","CaseIncidence.pdf"),width = 8, height = 14)
+
+npiList <- c("Google_Residential", "Google_Workplaces", "Google_Transit_stations",
+             "Google_Parks", "Google_Grocery_pharmacy", "Google_Retail_recreation",
+             "Social_Distancing", "Quaranting_Cases", "Close_Border")
+
+dateRange <- seq(from=min(both$date,na.rm=T), to=max(both$date,na.rm=T), length.out = 23)
+dateSplits <- seq(from=11, to=23, length.out = 4)
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+NPIplotAnimation <- function(myNPI = npiList[1], myDate = "2020-03-28"){
+  startDate <- dateRange[1]
+  endDate <- dateRange[dateSplits[1]]
+  bothSub <- subset(both,date<=endDate & date>=startDate)
+  npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
+  npiDensityPlotDataMelted1 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
+  npi1 <- ggplot(npiDensityPlotDataMelted1, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
+    geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
+    scale_y_discrete(expand = c(0.0005, 0)) +
+    scale_fill_viridis(name = "", option = "C") +
+    labs(title = paste0(format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d")),
+         subtitle = '')+
+    xlab(simpleCap(paste(unlist(strsplit(myNPI,"_")), sep=" ", collapse=" ")))+
+    theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
+  
+  startDate <- dateRange[dateSplits[1]]
+  endDate <- dateRange[dateSplits[2]]
+  bothSub <- subset(both,date<=endDate & date>startDate)
+  npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
+  npiDensityPlotDataMelted2 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
+  npi2 <- ggplot(npiDensityPlotDataMelted2, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
+    geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
+    scale_y_discrete(expand = c(0.0005, 0)) +
+    scale_fill_viridis(name = "", option = "C") +
+    labs(title = paste0(format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d")),
+         subtitle = '')+
+    xlab(simpleCap(paste(unlist(strsplit(myNPI,"_")), sep=" ", collapse=" ")))+
+    theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
+  
+  startDate <- dateRange[dateSplits[2]]
+  endDate <- dateRange[dateSplits[3]]
+  bothSub <- subset(both,date<=endDate & date>startDate)
+  npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
+  npiDensityPlotDataMelted3 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
+  npi3 <- ggplot(npiDensityPlotDataMelted3, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
+    geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
+    scale_y_discrete(expand = c(0.0005, 0)) +
+    scale_fill_viridis(name = "", option = "C") +
+    labs(title = paste0(format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d")),
+         subtitle = '')+
+    xlab(simpleCap(paste(unlist(strsplit(myNPI,"_")), sep=" ", collapse=" ")))+
+    theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
+  
+  startDate <- dateRange[dateSplits[3]]
+  endDate <- dateRange[dateSplits[4]]
+  bothSub <- subset(both,date<=endDate & date>=startDate)
+  npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
+  npiDensityPlotDataMelted4 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
+  npi4 <- ggplot(npiDensityPlotDataMelted4, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
+    geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
+    scale_y_discrete(expand = c(0.0005, 0)) +
+    scale_fill_viridis(name = "", option = "C") +
+    labs(title = paste0(format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d")),
+         subtitle = '')+
+    xlab(simpleCap(paste(unlist(strsplit(myNPI,"_")), sep=" ", collapse=" ")))+
+    theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
+  
+  startDate <- myDate-7
+  endDate <- myDate+7
+  bothSub <- subset(both,date<=endDate & date>=startDate)
+  npiDensityPlotData <- bothSub[c("date", "Country.x","movingAverage",myNPI)]
+  npiDensityPlotDataMelted5 <- melt(npiDensityPlotData, id = c("date", "Country.x","movingAverage"))
+  npi5 <- ggplot(npiDensityPlotDataMelted5, aes(x = `value`, y = `Country.x`, fill = ..x..)) +
+    geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, gradient_lwd = 3.) +
+    scale_y_discrete(expand = c(0.0005, 0)) +
+    scale_fill_viridis(name = "", option = "C") +
+    labs(title = paste0(format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d")),
+         subtitle = '')+
+    xlab(simpleCap(paste(unlist(strsplit(myNPI,"_")), sep=" ", collapse=" ")))+
+    theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
+  
+  # Make commmon axis
+  minx <- min(both[[myNPI]],na.rm=T)
+  maxx <- max(both[[myNPI]],na.rm=T)
+  lowerRange <- minx-(maxx-minx)*.15
+  upperRange <- maxx+(maxx-minx)*.15
+  outerBound <- c(abs(lowerRange),abs(upperRange))[which.max(c(abs(lowerRange),abs(upperRange)))]
+  if((upperRange-lowerRange)>10){
+    npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_viridis(alpha= 1, limits = c(-outerBound, outerBound), oob = scales::squish, name = "", option = "C")
+    npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_viridis(alpha= 1, limits = c(-outerBound, outerBound), oob = scales::squish, name = "", option = "C")
+    npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_viridis(alpha= 1, limits = c(-outerBound, outerBound), oob = scales::squish, name = "", option = "C")
+    npi4 <- npi4 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_viridis(alpha= 1, limits = c(-outerBound, outerBound), oob = scales::squish, name = "", option = "C")
+    npi5 <- npi5 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_viridis(alpha= 1, limits = c(-outerBound, outerBound), oob = scales::squish, name = "", option = "C")
+  }else{
+    if(myNPI == "Social_Distancing"){
+      npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(-4, 12), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
+      npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(-4, 12), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
+      npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(-4, 12), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
+      npi4 <- npi4 + scale_x_continuous(expand = c(0.01, 0), limits = c(-4, 12), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
+      npi5 <- npi5 + scale_x_continuous(expand = c(0.01, 0), limits = c(-4, 12), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
+  }else{
+      npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(-2, 7.5), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
+      npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(-2, 7.5), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
+      npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(-2, 7.5), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
+      npi4 <- npi4 + scale_x_continuous(expand = c(0.01, 0), limits = c(-2, 7.5), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
+      npi5 <- npi5 + scale_x_continuous(expand = c(0.01, 0), limits = c(-2, 7.5), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
+    }
+  }
+  
+  title_paste <- paste0(simpleCap(paste(unlist(strsplit(myNPI,"_")), sep=" ", collapse=" "))," Density Plots by Country")
+  
+  gl <- list(npi5)
+  grid.arrange(grobs = gl, 
+               top = textGrob(title_paste, gp=gpar(fontsize=18)), 
+               layout_matrix = rbind( c(1)),
+               common.legend = TRUE, legend="bottom"
+  )
+}
+
+# print(NPIplotter(myNPI = npiList[1]))
+
+
+# for(d_d in 1:length(d_dRange)){
+#   # for(n_n in 7){
+#   print("Google_Workplaces")
+#   print(d_d)
+#   print(d_dRange[d_d])
+#   print(NPIplotAnimation(myNPI = "Google_Workplaces", myDate = d_dRange[d_d]))
+# }
+
+
+# install.packages("magick")
+# install.packages("animation")
+library(animation)
+library(magick)
+d_dRange <- seq(from=dateRange[dateSplits[1]], to=(dateRange[dateSplits[1]]+45), length.out = 45)
+for(n_n in 1:length(npiList)){
+    print(n_n)
+    print(npiList[n_n])
+  saveGIF({
+    for (d_d in 1:length(d_dRange)){
+      print(NPIplotAnimation(myNPI = npiList[n_n], myDate = d_dRange[d_d]))}
+  }, interval = .2, movie.name=paste0(npiList[n_n],".gif"))
+}
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
+
+dev.off()
+
