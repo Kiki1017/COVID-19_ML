@@ -171,11 +171,11 @@ for(cc in 1:length(testing_countriesList)){
     # make sure the window is an odd integer
     window <- 7
     # dim(training_subset_aligned)
-    # length(rollmean(training_subset_aligned$confirmed_cum, k=window))
-    training_subset_aligned$movingAverage <- c(training_subset_aligned$confirmed_cum[1:((window-1)/2)],rollmean(training_subset_aligned$confirmed_cum, k=window, align = "center"),training_subset_aligned$confirmed_cum[(nrow(training_subset_aligned)-((window-1)/2)+1):nrow(training_subset_aligned)])
+    # length(rollmean(training_subset_aligned$confirmed, k=window))
+    training_subset_aligned$movingAverage <- c(training_subset_aligned$confirmed[1:((window-1)/2)],rollmean(training_subset_aligned$confirmed, k=window, align = "center"),training_subset_aligned$confirmed[(nrow(training_subset_aligned)-((window-1)/2)+1):nrow(training_subset_aligned)])
     # Plot cases
     gg <- ggplot(training_subset_aligned) +
-      geom_line(aes(x=date, y=confirmed_cum),color="red") +
+      geom_line(aes(x=date, y=confirmed),color="red") +
       geom_line(aes(x=date, y=movingAverage),color="blue") +
       ggtitle(paste0("Reported cases in ", training_countries[i]))
     print(gg)
@@ -253,11 +253,11 @@ for(cc in 1:length(testing_countriesList)){
     # make sure the window is an odd integer
     window <- 7
     # dim(testing_subset_aligned)
-    # length(rollmean(testing_subset_aligned$confirmed_cum_per_million, k=window))
-    testing_subset_aligned$movingAverage <- c(testing_subset_aligned$confirmed_cum_per_million[1:((window-1)/2)],rollmean(testing_subset_aligned$confirmed_cum_per_million, k=window, align = "center"),testing_subset_aligned$confirmed_cum_per_million[(nrow(testing_subset_aligned)-((window-1)/2)+1):nrow(testing_subset_aligned)])
+    # length(rollmean(testing_subset_aligned$confirmed, k=window))
+    testing_subset_aligned$movingAverage <- c(testing_subset_aligned$confirmed[1:((window-1)/2)],rollmean(testing_subset_aligned$confirmed, k=window, align = "center"),testing_subset_aligned$confirmed[(nrow(testing_subset_aligned)-((window-1)/2)+1):nrow(testing_subset_aligned)])
     # Plot cases
     gg <- ggplot(testing_subset_aligned) +
-      geom_line(aes(x=date, y=confirmed_cum_per_million),color="red") +
+      geom_line(aes(x=date, y=confirmed),color="red") +
       geom_line(aes(x=date, y=movingAverage),color="blue") +
       ggtitle(paste0("Reported cases in ", training_countries[i]))
     print(gg)
