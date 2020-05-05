@@ -178,6 +178,10 @@ for(i in 1:length(training_countries)){
   # dim(training_subset_aligned)
   # length(rollmean(training_subset_aligned$confirmed, k=window))
   training_subset_aligned$movingAverage <- c(training_subset_aligned$confirmed[1:((window-1)/2)],rollmean(training_subset_aligned$confirmed, k=window, align = "center"),training_subset_aligned$confirmed[(nrow(training_subset_aligned)-((window-1)/2)+1):nrow(training_subset_aligned)])
+  
+  training_subset_aligned$confirmedMA <- c(training_subset_aligned$confirmed[1:((window-1)/2)],rollmean(training_subset_aligned$confirmed, k=window, align = "center"),training_subset_aligned$confirmed[(nrow(training_subset_aligned)-((window-1)/2)+1):nrow(training_subset_aligned)])
+  training_subset_aligned$deathsMA <- c(training_subset_aligned$death[1:((window-1)/2)],rollmean(training_subset_aligned$death, k=window, align = "center"),training_subset_aligned$death[(nrow(training_subset_aligned)-((window-1)/2)+1):nrow(training_subset_aligned)])
+  
   # Plot cases
   gg <- ggplot(training_subset_aligned) +
     geom_line(aes(x=date, y=confirmed),color="red") +
@@ -272,10 +276,10 @@ if(NPIflag1 == "autofill"){
     prevcountry <- curcountry
   }
 }
-peek_at_NPIs_training2 <- training_manipulate[,c(c("date","time","Country.x","ISO3","confirmed","death","movingAverage","confirmed_cum","death_cum"),names(training_manipulate)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(training_manipulate))])]
+peek_at_NPIs_training2 <- training_manipulate[,c(c("date","time","Country.x","ISO3","confirmed","confirmedMA","death","deathMA","movingAverage","confirmed_cum","death_cum"),names(training_manipulate)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(training_manipulate))])]
 
 both <- peek_at_NPIs_training2
-npiDensityPlotData <- both[c("date", "Country.x","confirmed","death","movingAverage","confirmed_cum","death_cum","Google_Residential", "Google_Workplaces", "Google_Transit_stations",
+npiDensityPlotData <- both[c("date", "Country.x","confirmed","death","movingAverage","confirmed","death","Google_Residential", "Google_Workplaces", "Google_Transit_stations",
                              "Google_Parks", "Google_Grocery_pharmacy", "Google_Retail_recreation",
                              "Social_Distancing", "Quaranting_Cases", "Close_Border")]
 
@@ -292,14 +296,10 @@ simpleCap <- function(x) {
 unlink(paste0("./Output_CaseIncidence/npidensAnimation_","CaseIncidence.pdf"))
 pdf(paste0("./Output_CaseIncidence/npidensAnimation_","CaseIncidence.pdf"),width = 8, height = 14)
 
-npiList <- c("movingAverage","Google_Residential", "Google_Workplaces", "Google_Transit_stations",
-             "Google_Parks", "Google_Grocery_pharmacy", "Google_Retail_recreation",
-             "Social_Distancing", "Quaranting_Cases", "Close_Border")
-
 dateRange <- seq(from=min(both$date,na.rm=T), to=max(both$date,na.rm=T), length.out = 23)
 dateSplits <- seq(from=11, to=23, length.out = 4)
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
-NPIplotAnimation <- function(myNPI = npiList[1], myDate = as.Date("2020-03-28"), index){
+NPIplotAnimation <- function(myNPI = npiList[1], myDate = as.Date("2020-03-28"), title = NA, xx = NA){
   # startDate <- dateRange[1]
   # endDate <- dateRange[dateSplits[1]]
   # bothSub <- subset(both,date<=endDate & date>=startDate)
@@ -376,19 +376,22 @@ NPIplotAnimation <- function(myNPI = npiList[1], myDate = as.Date("2020-03-28"),
     # npi5 <- ggplot(npiDensityPlotDataMelted5, aes(x = `value`, y = `Country.x`, group = `Country.x`, fill = ..x..)) +
     # geom_density_ridges_gradient() +
     # geom_density_ridges_gradient(scale = 3, rel_min_height = 0.001, gradient_lwd = 3., panel_scaling=F, bandwidth = 3) +
-    geom_density_ridges_gradient(
-      jittered_points = TRUE, scale = .95, rel_min_height = .01,
-      point_shape = "|", point_size = 3, size = 0.25,
-      position = position_points_jitter(height = 0)
+    geom_density_ridges_gradient(scale = 3, rel_min_height = 0.001, gradient_lwd = 3,
+                                 jittered_points = TRUE,
+                                 point_shape = "|", point_size = 3, size = 0.25,
+                                 position = position_points_jitter(height = 0)
     ) +
     # scale_y_discrete(expand = c(0, 0)) +
     # scale_y_continuous(breaks=c(1:length(Clist)),labels=c(Clist[1:(length(Clist)-1)],""),expand=c(0.0,2)) +
     scale_y_continuous(breaks=c(1:length(Clist)),labels=Clist,expand=c(0.0,.5)) +
     scale_fill_viridis(name = "", option = "C") +
     labs(title = paste0(format(myDate, format="%B %d")), subtitle = paste0(format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d")))+
-    xlab(simpleCap(paste(unlist(strsplit(myNPI,"_")), sep=" ", collapse=" ")))+
     theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank(), plot.title = element_text(margin = unit(c(0,0,0,0), "cm")))
-  # npi5
+  if(is.na(xx)){
+    npi5 <- npi5 + xlab(simpleCap(paste(unlist(strsplit(myNPI,"_")), sep=" ", collapse=" ")))
+  }else{
+    npi5 <- npi5 + xlab(xx)
+  }
   # Make commmon axis
   minx <- min(both[[myNPI]],na.rm=T)
   maxx <- max(both[[myNPI]],na.rm=T)
@@ -402,18 +405,17 @@ NPIplotAnimation <- function(myNPI = npiList[1], myDate = as.Date("2020-03-28"),
     # npi4 <- npi4 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_viridis(alpha= 1, limits = c(-outerBound, outerBound), oob = scales::squish, name = "", option = "C")
     npi5 <- npi5 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(-outerBound, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))+
       scale_point_color_gradient(limits = c(-outerBound, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
-    if(myNPI == "movingAverage"){
+    if(myNPI %in% c("confirmed","death")){
       minx <- min(both[[myNPI]],na.rm=T)
       maxx <- max(both[[myNPI]],na.rm=T)
-      lowerRange <- minx-(maxx-minx)*.07
-      upperRange <- maxx+(maxx-minx)*.07
+      lowerRange <- minx-(maxx-minx)*.02
+      upperRange <- maxx+(maxx-minx)*.02
       outerBound <- c(abs(lowerRange),abs(upperRange))[which.max(c(abs(lowerRange),abs(upperRange)))]
-      # npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
-      # npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
-      # npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
-      # npi4 <- npi4 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
-      npi5 <- npi5 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))+
-        xlab(paste0("New Daily Cases"))
+      # # npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
+      # # npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
+      # # npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
+      # # npi4 <- npi4 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
+      npi5 <- npi5 + scale_x_continuous(expand = c(0.01, 0), limits = c(0,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
     }
   }else{
     if(myNPI == "Social_Distancing"){
@@ -431,11 +433,16 @@ NPIplotAnimation <- function(myNPI = npiList[1], myDate = as.Date("2020-03-28"),
     }
   }
   
-  if(myNPI == "movingAverage"){
-    title_paste <- paste0("New Daily Cases Density")
+  if(is.na(title)){
+    if(myNPI == "movingAverage"){
+      title_paste <- paste0("New Daily Cases Density")
+    }else{
+      title_paste <- paste0(simpleCap(paste(unlist(strsplit(myNPI,"_")), sep=" ", collapse=" "))," Density")
+    }
   }else{
-    title_paste <- paste0(simpleCap(paste(unlist(strsplit(myNPI,"_")), sep=" ", collapse=" "))," Density")
+    title_paste <- title
   }
+
   
   gl <- list(npi5)
   final <- grid.arrange(grobs = gl, 
@@ -464,18 +471,57 @@ library(animation)
 library(magick)
 # d_dRange <- as.Date(c(as.Date(min(both$date,na.rm=T)):as.Date(max(both$date,na.rm=T))))
 d_dRange <- as.Date(c(as.Date("2020-02-15"):as.Date("2020-05-03")))
+# d_dRange <- as.Date(c(as.Date("2020-03-15"):as.Date("2020-03-30")))
 
 # d_dRange <- seq(from=as.Date("2020-04-05"), to=as.Date("2020-04-13"), length.out = 8)
 
-for(n_n in 1:length(npiList)){
-  # for(n_n in 3:3){
+npiList <- c("confirmedMA",
+             "deathMA",
+             "Google_Residential", 
+             "Google_Workplaces", 
+             "Google_Transit_stations",
+             "Google_Parks", 
+             "Google_Grocery_pharmacy", 
+             "Google_Retail_recreation",
+             "Social_Distancing", 
+             "Quaranting_Cases", 
+             "Close_Border")
+
+titleList <- c("11 Day Sliding Window of Confirmed New Daily Cases",
+               "11 Day Sliding Window of Confirmed New Daily Deaths",
+               "11 Day Sliding Window of Percent Change in Visits to Residential Areas", 
+               "11 Day Sliding Window of Percent Change in Visits to Workplaces", 
+               "11 Day Sliding Window of Percent Change in Visits to Transit Stations",
+               "11 Day Sliding Window of Percent Change in Visits to Parks", 
+               "11 Day Sliding Window of Percent Change in Visits to Grocery & Pharmacy", 
+               "11 Day Sliding Window of Percent Change in Visits to Retail & Recreation",
+               "11 Day Sliding Window of Social Distancing Scale", 
+               "11 Day Sliding Window of Quarantining Cases Scale", 
+               "11 Day Sliding Window of Restricting the Border Scale")
+
+xxList <- c("Confirmed New Daily Cases",
+               "Confirmed New Daily Deaths",
+               "Percent Change in Visits to Residential Areas", 
+               "Percent Change in Visits to Workplaces", 
+               "Percent Change in Visits to Transit Stations",
+               "Percent Change in Visits to Parks", 
+               "Percent Change in Visits to Grocery & Pharmacy", 
+               "Percent Change in Visits to Retail & Recreation",
+               "Social Distancing Scale", 
+               "Quarantining Cases Scale", 
+               "Restricting the Border Scale")
+
+# for(n_n in 1:length(npiList)){
+for(n_n in 1:1){
   print(n_n)
   print(npiList[n_n])
   saveGIF({
     for (d_d in 1:length(d_dRange)){
-      NPIplotAnimation(myNPI = npiList[n_n], myDate = d_dRange[d_d])}
-  }, interval = .2, movie.name=paste0("USA",npiList[n_n],".gif"),ani.width = 600, ani.height = 750)
+      NPIplotAnimation(myNPI = npiList[n_n], myDate = d_dRange[d_d], title = titleList[n_n], xx = xxList[n_n])}
+  }, interval = .2, movie.name=paste0(npiList[n_n],".gif"),ani.width = 600, ani.height = 750)
 }
+
+
 
 
 

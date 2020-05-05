@@ -70,14 +70,23 @@ for(j in 2:ncol(CaseDataSub)){
   }
 }
 head(CaseDataSubAgg)
-CaseDataSubAggMelt <- melt(CaseDataSubAgg, id="Country.x")
-colnames(CaseDataSubAggMelt) <- c("Country.x", "date", "Confirmed_Cases")
+CaseDataSubAggDiff <- CaseDataSubAgg
+for(j in 3:ncol(CaseDataSubAgg)){
+  CaseDataSubAggDiff[,j] <- CaseDataSubAgg[,(j)] - CaseDataSubAgg[,(j-1)]
+}
+for(i in 1:nrow(CaseDataSubAggDiff)){
+  window <- 7
+  ts <- unlist(CaseDataSubAggDiff[i,2:ncol(CaseDataSubAggDiff)])
+  CaseDataSubAggDiff[i,2:ncol(CaseDataSubAggDiff)] <- c(ts[1:((window-1)/2)],rollmean(ts, k=window, align = "center"),ts[(length(ts)-((window-1)/2)+1):length(ts)])
+}
+CaseDataSubAggMelt <- melt(CaseDataSubAggDiff, id="Country.x")
+colnames(CaseDataSubAggMelt) <- c("Country.x", "date", "confirmed")
 CaseDataSubAggMelt$date <- as.Date(CaseDataSubAggMelt$date)
 str(CaseDataSubAggMelt)
 str(GoogData_sub2)
-merge1 <- GoogData_sub2 %>% left_join(CaseDataSubAggMelt, by = c("Country.x" = "Country.x", "date" = "date"))
+merge1 <- GoogData_sub2 %>% full_join(CaseDataSubAggMelt, by = c("Country.x" = "Country.x", "date" = "date"))
 
-download.file("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_US.csv","./InputData/time_series_covid19_deaths_US.csv")
+download.file("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_US.csv","./InputData/time_series_covid19_deaths_US.csv")
 DeathData <- read.csv("./InputData/time_series_covid19_deaths_US.csv", header=T, stringsAsFactors = F)
 DeathDataSub <- DeathData %>% select(Province_State,starts_with("X"))
 for(j in 2:ncol(DeathDataSub)){
@@ -94,24 +103,27 @@ for(j in 2:ncol(DeathDataSub)){
   }
 }
 head(DeathDataSubAgg)
-DeathDataSubAggMelt <- melt(DeathDataSubAgg, id="Country.x")
-colnames(DeathDataSubAggMelt) <- c("Country.x", "date", "Confirmed_Deaths")
+DeathDataSubAggDiff <- DeathDataSubAgg
+for(j in 3:ncol(DeathDataSubAgg)){
+  DeathDataSubAggDiff[,j] <- DeathDataSubAgg[,(j)] - DeathDataSubAgg[,(j-1)]
+}
+for(i in 1:nrow(DeathDataSubAggDiff)){
+  window <- 7
+  ts <- unlist(DeathDataSubAggDiff[i,2:ncol(DeathDataSubAggDiff)])
+  DeathDataSubAggDiff[i,2:ncol(DeathDataSubAggDiff)] <- c(ts[1:((window-1)/2)],rollmean(ts, k=window, align = "center"),ts[(length(ts)-((window-1)/2)+1):length(ts)])
+}
+DeathDataSubAggMelt <- melt(DeathDataSubAggDiff, id="Country.x")
+colnames(DeathDataSubAggMelt) <- c("Country.x", "date", "deaths")
 DeathDataSubAggMelt$date <- as.Date(DeathDataSubAggMelt$date)
 str(DeathDataSubAggMelt)
 str(GoogData_sub2)
-merge2 <- merge1 %>% left_join(DeathDataSubAggMelt, by = c("Country.x" = "Country.x", "date" = "date"))
+merge2 <- merge1 %>% full_join(DeathDataSubAggMelt, by = c("Country.x" = "Country.x", "date" = "date"))
+
+
+
 
 #---NPI Density Animation---#########################################################################################################################################################################
 # both <- subset(both, Country.x != "US")
-
-if(myNPI %in% c("Confirmed_Cases","Confirmed_Deaths")){
-  tmpy <- subset(merge2, Country.x != "USA")
-  both <- tmpy
-}else{
-  both <- merge2
-}
-
-
 
 simpleCap <- function(x) {
   s <- strsplit(x, " ")[[1]]
@@ -124,19 +136,12 @@ simpleCap <- function(x) {
 unlink(paste0("./Output_CaseIncidence/npidensAnimation_","CaseIncidence.pdf"))
 pdf(paste0("./Output_CaseIncidence/npidensAnimation_","CaseIncidence.pdf"),width = 8, height = 14)
 
-npiList <- c("Confirmed_Cases",
-             "Confirmed_Deaths",
-             "Google_Retail_recreation",
-             "Google_Grocery_pharmacy",
-             "Google_Parks",
-             "Google_Transit_stations",
-             "Google_Workplaces",
-             "Google_Residential")
 
-dateRange <- seq(from=min(both$date,na.rm=T), to=max(both$date,na.rm=T), length.out = 23)
+
+dateRange <- seq(from=min(merge2$date,na.rm=T), to=max(merge2$date,na.rm=T), length.out = 23)
 dateSplits <- seq(from=11, to=23, length.out = 4)
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
-NPIplotAnimation <- function(myNPI = npiList[1], myDate = as.Date("2020-03-28"), index){
+NPIplotAnimation <- function(myNPI = npiList[1], myDate = as.Date("2020-03-28"), title = NA, xx = NA, merge2 = merge2){
   # startDate <- dateRange[1]
   # endDate <- dateRange[dateSplits[1]]
   # bothSub <- subset(both,date<=endDate & date>=startDate)
@@ -192,6 +197,12 @@ NPIplotAnimation <- function(myNPI = npiList[1], myDate = as.Date("2020-03-28"),
   #        subtitle = '')+
   #   xlab(simpleCap(paste(unlist(strsplit(myNPI,"_")), sep=" ", collapse=" ")))+
   #   theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
+  if(myNPI %in% c("confirmed","deaths")){
+    tmpy <- subset(merge2, Country.x != "USA" )
+    both <- tmpy
+  }else{
+    both <- merge2
+  }
   
   startDate <- myDate-5
   endDate <- myDate+5
@@ -202,7 +213,7 @@ NPIplotAnimation <- function(myNPI = npiList[1], myDate = as.Date("2020-03-28"),
   npiDensityPlotDataMelted5 <- melt(npiDensityPlotData, id = c("date", "Country.x"))
   npiDensityPlotDataMelted5$Country.x <- as.character(npiDensityPlotDataMelted5$Country.x)
   Clist1 <- unique(sort(npiDensityPlotDataMelted5$Country.x))
-  if(myNPI %in% c("Confirmed_Cases","Confirmed_Deaths")){
+  if(myNPI %in% c("confirmed","deaths")){
     Clist <- Clist1
   }else{
     Clist <- c(Clist1[which(Clist1!="USA")], "USA")
@@ -227,8 +238,12 @@ NPIplotAnimation <- function(myNPI = npiList[1], myDate = as.Date("2020-03-28"),
     scale_y_continuous(breaks=c(1:length(Clist)),labels=Clist,expand=c(0.0,.5)) +
     scale_fill_viridis(name = "", option = "C") +
     labs(title = paste0(format(myDate, format="%B %d")), subtitle = paste0(format(startDate, format="%B %d"), " - ",format(endDate, format="%B %d")))+
-    xlab(simpleCap(paste(unlist(strsplit(myNPI,"_")), sep=" ", collapse=" ")))+
     theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank(), plot.title = element_text(margin = unit(c(0,0,0,0), "cm")))
+  if(is.na(xx)){
+    npi5 <- npi5 + xlab(simpleCap(paste(unlist(strsplit(myNPI,"_")), sep=" ", collapse=" ")))
+  }else{
+    npi5 <- npi5 + xlab(xx)
+  }
   # npi5
   # Make commmon axis
   minx <- min(both[[myNPI]],na.rm=T)
@@ -237,7 +252,7 @@ NPIplotAnimation <- function(myNPI = npiList[1], myDate = as.Date("2020-03-28"),
   upperRange <- maxx+(maxx-minx)*.15
   outerBound <- c(abs(lowerRange),abs(upperRange))[which.max(c(abs(lowerRange),abs(upperRange)))]
   if((upperRange-lowerRange)>10){
-    if(myNPI %in% c("Confirmed_Cases","Confirmed_Deaths")){
+    if(myNPI %in% c("confirmed","deaths")){
       minx <- min(both[[myNPI]],na.rm=T)
       maxx <- max(both[[myNPI]],na.rm=T)
       lowerRange <- minx-(maxx-minx)*.02
@@ -247,7 +262,7 @@ NPIplotAnimation <- function(myNPI = npiList[1], myDate = as.Date("2020-03-28"),
       # # npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
       # # npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
       # # npi4 <- npi4 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
-      npi5 <- npi5 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
+      npi5 <- npi5 + scale_x_continuous(expand = c(0.01, 0), limits = c(0,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
     }else{
       # npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_viridis(alpha= 1, limits = c(-outerBound, outerBound), oob = scales::squish, name = "", option = "C")
       # npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_viridis(alpha= 1, limits = c(-outerBound, outerBound), oob = scales::squish, name = "", option = "C")
@@ -259,7 +274,15 @@ NPIplotAnimation <- function(myNPI = npiList[1], myDate = as.Date("2020-03-28"),
   }
   
 
-  title_paste <- paste0(simpleCap(paste(unlist(strsplit(myNPI,"_")), sep=" ", collapse=" "))," Density")
+  if(is.na(title)){
+    if(myNPI == "movingAverage"){
+      title_paste <- paste0("New Daily Cases Density")
+    }else{
+      title_paste <- paste0(simpleCap(paste(unlist(strsplit(myNPI,"_")), sep=" ", collapse=" "))," Density")
+    }
+  }else{
+    title_paste <- title
+  }
 
   
   gl <- list(npi5)
@@ -287,21 +310,51 @@ NPIplotAnimation <- function(myNPI = npiList[1], myDate = as.Date("2020-03-28"),
 # install.packages("animation")
 library(animation)
 library(magick)
-d_dRange <- as.Date(c(as.Date(min(both$date,na.rm=T)):as.Date(max(both$date,na.rm=T))))
+d_dRange <- as.Date(c(as.Date(min(merge2$date,na.rm=T)):as.Date(max(merge2$date,na.rm=T))))
 # d_dRange <- as.Date(c(as.Date("2020-04-05"):as.Date("2020-04-15")))
 
 # d_dRange <- seq(from=as.Date("2020-04-05"), to=as.Date("2020-04-13"), length.out = 8)
 
+
+npiList <- c("confirmed",
+             "deaths",
+             "Google_Residential",
+             "Google_Workplaces",
+             "Google_Transit_stations",
+             "Google_Parks",
+             "Google_Grocery_pharmacy",
+             "Google_Retail_recreation"
+            )
+
+titleList <- c("11 Day Sliding Window of Confirmed New Daily Cases",
+               "11 Day Sliding Window of Confirmed New Daily Deaths",
+               "11 Day Sliding Window of Percent Change in Visits to Residential Areas", 
+               "11 Day Sliding Window of Percent Change in Visits to Workplaces", 
+               "11 Day Sliding Window of Percent Change in Visits to Transit Stations",
+               "11 Day Sliding Window of Percent Change in Visits to Parks", 
+               "11 Day Sliding Window of Percent Change in Visits to Grocery & Pharmacy", 
+               "11 Day Sliding Window of Percent Change in Visits to Retail & Recreation"
+              )
+
+xxList <- c("Confirmed New Daily Cases",
+            "Confirmed New Daily Deaths",
+            "Percent Change in Visits to Residential Areas", 
+            "Percent Change in Visits to Workplaces", 
+            "Percent Change in Visits to Transit Stations",
+            "Percent Change in Visits to Parks", 
+            "Percent Change in Visits to Grocery & Pharmacy", 
+            "Percent Change in Visits to Retail & Recreation"
+            )
+
 # for(n_n in 1:length(npiList)){
-for(n_n in 2:2){
+for(n_n in 1:1){
   print(n_n)
   print(npiList[n_n])
   saveGIF({
     for (d_d in 1:length(d_dRange)){
-      NPIplotAnimation(myNPI = npiList[n_n], myDate = d_dRange[d_d])}
+      NPIplotAnimation(myNPI = npiList[n_n], myDate = d_dRange[d_d], title = titleList[n_n], xx = xxList[n_n], merge2 = merge2)}
   }, interval = .2, movie.name=paste0("USA",npiList[n_n],".gif"),ani.width = 600, ani.height = 750)
 }
-
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
