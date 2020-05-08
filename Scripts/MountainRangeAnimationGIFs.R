@@ -81,7 +81,7 @@ training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","HUB","KOR","USA
 # training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","KOR","USA","SWE","AUT","CHE","DEU","FRA","DZA","IRN","CAN","TUR","BEL","ANT","PRT","ISR","RUS","NOR","IRL","AUS","IND","DNK","CHL","CZE","JPN","UKR","MAR","ARG","SGP","ROU")
 
 # training_countries <- training_countries_all[which(training_countries_all != testing_countries)]
-training_countries <- training_countries_all
+# training_countries <- training_countries_all
 
 #---Estimating reproduction numbers, R0---#########################################################################################################################################################################
 # We are using the epiestim package to calculate the R0 for countries. This requires two things
@@ -156,18 +156,17 @@ config = make_config(list(si_parametric_distr = "G",
 
 #---trainingTestingDataFrames---#########################################################################################################################################################################
 # create training dataframe
+
+training_countries <- unique(data_clean$Country.x)
+
 pdf("R0_plot.pdf",width = 11,height = 8.5)
 for(i in 1:length(training_countries)){
-  training_subset <- subset(data_clean,ISO3 %in% training_countries[i])
-  if(incidence_flag==T & death_flag == F){
-    start <- which(training_subset$confirmed_cum_per_million >= incidence_start_point)[1]
-  }else if(incidence_flag==T & death_flag == T){
-    start <- which(training_subset$death_cum_per_million >= incidence_start_point)[1]
-  }else if(incidence_flag==F & death_flag == F){
-    start <- which(training_subset$confirmed_cum >= count_start_point)[1]
-  }else if(incidence_flag==F & death_flag == T){
-    start <- which(training_subset$death_cum >= count_start_point)[1]
-  }
+  training_subset <- subset(data_clean,Country.x %in% training_countries[i])
+  training_subset <- training_subset[order(training_subset$date),]
+  
+  # start <- which(training_subset$confirmed > 0)[1]
+  start <- which(training_subset$date == "2020-01-22")
+  training_subset_aligned <- training_subset[start:nrow(training_subset),]
   
   training_subset_aligned <- training_subset[start:nrow(training_subset),]
   training_subset_aligned$time <- c(1:nrow(training_subset_aligned))
@@ -276,14 +275,15 @@ if(NPIflag1 == "autofill"){
     prevcountry <- curcountry
   }
 }
-peek_at_NPIs_training2 <- training_manipulate[,c(c("date","time","Country.x","ISO3","confirmed","confirmedMA","death","deathMA","movingAverage","confirmed_cum","death_cum"),names(training_manipulate)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(training_manipulate))])]
+peek_at_NPIs_training2 <- training_manipulate[,c(c("date","time","Country.x","ISO3","confirmed","confirmedMA","death","deathsMA","movingAverage","confirmed_cum","death_cum"),names(training_manipulate)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(training_manipulate))])]
 
 both <- peek_at_NPIs_training2
 npiDensityPlotData <- both[c("date", "Country.x","confirmed","death","movingAverage","confirmed","death","Google_Residential", "Google_Workplaces", "Google_Transit_stations",
                              "Google_Parks", "Google_Grocery_pharmacy", "Google_Retail_recreation",
                              "Social_Distancing", "Quaranting_Cases", "Close_Border")]
 
-# both <- subset(both, Country.x != "US")
+both_sub <- subset(both, Country.x %ni% training_countries_all)
+both_sub_noUSA <- subset(both, Country.x %ni% c("US"))
 
 simpleCap <- function(x) {
   s <- strsplit(x, " ")[[1]]
@@ -299,7 +299,7 @@ pdf(paste0("./Output_CaseIncidence/npidensAnimation_","CaseIncidence.pdf"),width
 dateRange <- seq(from=min(both$date,na.rm=T), to=max(both$date,na.rm=T), length.out = 23)
 dateSplits <- seq(from=11, to=23, length.out = 4)
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
-NPIplotAnimation <- function(myNPI = npiList[1], myDate = as.Date("2020-03-28"), title = NA, xx = NA){
+NPIplotAnimation <- function(myNPI = npiList[1], myDate = as.Date("2020-03-28"), title = NA, xx = NA, both = both, windowSide = 7){
   # startDate <- dateRange[1]
   # endDate <- dateRange[dateSplits[1]]
   # bothSub <- subset(both,date<=endDate & date>=startDate)
@@ -356,16 +356,17 @@ NPIplotAnimation <- function(myNPI = npiList[1], myDate = as.Date("2020-03-28"),
   #   xlab(simpleCap(paste(unlist(strsplit(myNPI,"_")), sep=" ", collapse=" ")))+
   #   theme_ridges(font_size = 13, grid = TRUE) + theme(axis.title.y = element_blank())
   
-  startDate <- myDate-5
-  endDate <- myDate+5
-  bothSub <- subset(both,date<=endDate & date>=startDate)
+  startDate <- myDate-windowSide
+  endDate <- myDate+windowSide
+  bothSub <- subset(both,date<=endDate & date>=startDate & Country.x != "Hubei")
   npiDensityPlotData <- bothSub[c("date", "Country.x",myNPI)]
   # tmpy <- subset(npiDensityPlotData, Country.x == "US"); tmpy$Country.x <- "ZZZ"; tmpy[[myNPI]] <- 0
   # npiDensityPlotData <- rbind(npiDensityPlotData,tmpy)
   npiDensityPlotDataMelted5 <- melt(npiDensityPlotData, id = c("date", "Country.x"))
   npiDensityPlotDataMelted5$Country.x <- as.character(npiDensityPlotDataMelted5$Country.x)
   Clist1 <- unique(sort(npiDensityPlotDataMelted5$Country.x))
-  Clist <- c(Clist1[which(Clist1!="US")], "US")
+  # Clist <- c(Clist1[which(Clist1!="US")], "US")
+  Clist <- Clist1
   npiDensityPlotDataMelted5$Country.x.num <- NA
   for(c in 1:nrow(npiDensityPlotDataMelted5)){
     myNum <- which(Clist == npiDensityPlotDataMelted5$Country.x[c])
@@ -392,6 +393,9 @@ NPIplotAnimation <- function(myNPI = npiList[1], myDate = as.Date("2020-03-28"),
   }else{
     npi5 <- npi5 + xlab(xx)
   }
+  if(myNPI == "R0"){
+    npi5 <- npi5 + geom_vline(xintercept=1, linetype="dashed", color = "#3b3620", size = .85, alpha = 0.6)
+  }
   # Make commmon axis
   minx <- min(both[[myNPI]],na.rm=T)
   maxx <- max(both[[myNPI]],na.rm=T)
@@ -399,37 +403,52 @@ NPIplotAnimation <- function(myNPI = npiList[1], myDate = as.Date("2020-03-28"),
   upperRange <- maxx+(maxx-minx)*.15
   outerBound <- c(abs(lowerRange),abs(upperRange))[which.max(c(abs(lowerRange),abs(upperRange)))]
   if((upperRange-lowerRange)>10){
-    # npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_viridis(alpha= 1, limits = c(-outerBound, outerBound), oob = scales::squish, name = "", option = "C")
-    # npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_viridis(alpha= 1, limits = c(-outerBound, outerBound), oob = scales::squish, name = "", option = "C")
-    # npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_viridis(alpha= 1, limits = c(-outerBound, outerBound), oob = scales::squish, name = "", option = "C")
-    # npi4 <- npi4 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_viridis(alpha= 1, limits = c(-outerBound, outerBound), oob = scales::squish, name = "", option = "C")
-    npi5 <- npi5 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(-outerBound, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))+
-      scale_point_color_gradient(limits = c(-outerBound, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
-    if(myNPI %in% c("confirmed","death")){
-      minx <- min(both[[myNPI]],na.rm=T)
-      maxx <- max(both[[myNPI]],na.rm=T)
-      lowerRange <- minx-(maxx-minx)*.02
-      upperRange <- maxx+(maxx-minx)*.02
-      outerBound <- c(abs(lowerRange),abs(upperRange))[which.max(c(abs(lowerRange),abs(upperRange)))]
-      # # npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
-      # # npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
-      # # npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
-      # # npi4 <- npi4 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
-      npi5 <- npi5 + scale_x_continuous(expand = c(0.01, 0), limits = c(0,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
-    }
-  }else{
+      # npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_viridis(alpha= 1, limits = c(-outerBound, outerBound), oob = scales::squish, name = "", option = "C")
+      # npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_viridis(alpha= 1, limits = c(-outerBound, outerBound), oob = scales::squish, name = "", option = "C")
+      # npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_viridis(alpha= 1, limits = c(-outerBound, outerBound), oob = scales::squish, name = "", option = "C")
+      # npi4 <- npi4 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_viridis(alpha= 1, limits = c(-outerBound, outerBound), oob = scales::squish, name = "", option = "C")
+      npi5 <- npi5 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(-outerBound, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))+
+        scale_point_color_gradient(limits = c(-outerBound, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
+      if(myNPI %in% c("confirmedMA","deathsMA")){
+        minx <- min(both[[myNPI]],na.rm=T)
+        maxx <- max(both[[myNPI]],na.rm=T)
+        lowerRange <- minx-(maxx-minx)*.02
+        upperRange <- maxx+(maxx-minx)*.02
+        outerBound <- c(abs(lowerRange),abs(upperRange))[which.max(c(abs(lowerRange),abs(upperRange)))]
+        # # npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
+        # # npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
+        # # npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
+        # # npi4 <- npi4 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
+        npi5 <- npi5 + scale_x_continuous(expand = c(0.01, 0), limits = c(0,upperRange)) + scale_fill_gradientn(colours = rev(c("#D7191C","#FDAE61","#ABDDA4","#2B83BA","white")),name = "", values = rescale(seq(from=0,to=outerBound,length.out=5), to = c(0, 1)), limits=c(0,outerBound))+
+          scale_point_color_gradient(limits = c(0, outerBound), oob = scales::squish, name = "", low = "#787a3a", high = "#787a3a")
+      }else if(myNPI %in% c("R0")){
+        minx <- min(both[[myNPI]],na.rm=T)
+        maxx <- max(both[[myNPI]],na.rm=T)
+        lowerRange <- minx-(maxx-minx)*.02
+        upperRange <- maxx+(maxx-minx)*.02
+        outerBound <- c(abs(lowerRange),abs(upperRange))[which.max(c(abs(lowerRange),abs(upperRange)))]
+        # # npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
+        # # npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
+        # # npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
+        # # npi4 <- npi4 + scale_x_continuous(expand = c(0.01, 0), limits = c(lowerRange,upperRange)) + scale_fill_gradient2(limits = c(0, outerBound), oob = scales::squish, name = "", low = muted("blue"), high = muted("red"))
+        npi5 <- npi5 + scale_x_continuous(expand = c(0.01, 0), limits = c(0,10)) + scale_fill_gradientn(colours = rev(c("#57090a","#D7191C","#e0ce00","#2B83BA","#0d2c40")),name = "", values = rescale(c(0,.8,1.2,outerBound), to = c(0, 1)), limits=c(0,outerBound))+
+          scale_point_color_gradient(limits = c(0, outerBound), oob = scales::squish, name = "", low = "#787a3a", high = "#787a3a")
+      }
+    }else{
     if(myNPI == "Social_Distancing"){
       # npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(-4, 12), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
       # npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(-4, 12), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
       # npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(-4, 12), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
       # npi4 <- npi4 + scale_x_continuous(expand = c(0.01, 0), limits = c(-4, 12), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
-      npi5 <- npi5 + scale_x_continuous(expand = c(0.01, 0), limits = c(-4, 12), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
+      npi5 <- npi5 + scale_x_continuous(expand = c(0.01, 0), limits = c(-4, 12), breaks=c(0,1,2,3,4,5)) + scale_fill_gradientn(colours = rev(c("#D7191C","#FDAE61","#ABDDA4","#2B83BA","white")),name = "", values = rescale(seq(from=0,to=outerBound,length.out=5), to = c(0, 1)), limits=c(0,outerBound))+
+        scale_point_color_gradient(limits = c(0, outerBound), oob = scales::squish, name = "", low = "#787a3a", high = "#787a3a")
     }else{
       # npi1 <- npi1 + scale_x_continuous(expand = c(0.01, 0), limits = c(-2, 7.5), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
       # npi2 <- npi2 + scale_x_continuous(expand = c(0.01, 0), limits = c(-2, 7.5), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
       # npi3 <- npi3 + scale_x_continuous(expand = c(0.01, 0), limits = c(-2, 7.5), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
       # npi4 <- npi4 + scale_x_continuous(expand = c(0.01, 0), limits = c(-2, 7.5), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
-      npi5 <- npi5 + scale_x_continuous(expand = c(0.01, 0), limits = c(-2, 7.5), breaks=c(0,1,2,3,4,5)) + scale_fill_viridis(alpha= 1, limits = c(lowerRange, upperRange), oob = scales::squish, name = "", option = "D")
+      npi5 <- npi5 + scale_x_continuous(expand = c(0.01, 0), limits = c(-2, 7.5), breaks=c(0,1,2,3,4,5)) + scale_fill_gradientn(colours = rev(c("#D7191C","#FDAE61","#ABDDA4","#2B83BA","white")),name = "", values = rescale(seq(from=0,to=outerBound,length.out=5), to = c(0, 1)), limits=c(0,outerBound))+
+        scale_point_color_gradient(limits = c(0, outerBound), oob = scales::squish, name = "", low = "#787a3a", high = "#787a3a")
     }
   }
   
@@ -446,7 +465,7 @@ NPIplotAnimation <- function(myNPI = npiList[1], myDate = as.Date("2020-03-28"),
   
   gl <- list(npi5)
   final <- grid.arrange(grobs = gl, 
-                        top = textGrob(title_paste, gp=gpar(fontsize=18)), 
+                        top = textGrob(title_paste, gp=gpar(fontsize=13)), 
                         layout_matrix = rbind( c(1)),
                         common.legend = TRUE, legend="bottom"
   )
@@ -467,6 +486,7 @@ NPIplotAnimation <- function(myNPI = npiList[1], myDate = as.Date("2020-03-28"),
 
 # install.packages("magick")
 # install.packages("animation")
+# install.packages('animation', repos = 'http://yihui.name/xran')
 library(animation)
 library(magick)
 # d_dRange <- as.Date(c(as.Date(min(both$date,na.rm=T)):as.Date(max(both$date,na.rm=T))))
@@ -475,8 +495,9 @@ d_dRange <- as.Date(c(as.Date("2020-02-15"):as.Date("2020-05-03")))
 
 # d_dRange <- seq(from=as.Date("2020-04-05"), to=as.Date("2020-04-13"), length.out = 8)
 
-npiList <- c("confirmedMA",
-             "deathMA",
+npiList <- c("R0",
+             "confirmedMA",
+             "deathsMA",
              "Google_Residential", 
              "Google_Workplaces", 
              "Google_Transit_stations",
@@ -487,19 +508,21 @@ npiList <- c("confirmedMA",
              "Quaranting_Cases", 
              "Close_Border")
 
-titleList <- c("11 Day Sliding Window of Confirmed New Daily Cases",
-               "11 Day Sliding Window of Confirmed New Daily Deaths",
-               "11 Day Sliding Window of Percent Change in Visits to Residential Areas", 
-               "11 Day Sliding Window of Percent Change in Visits to Workplaces", 
-               "11 Day Sliding Window of Percent Change in Visits to Transit Stations",
-               "11 Day Sliding Window of Percent Change in Visits to Parks", 
-               "11 Day Sliding Window of Percent Change in Visits to Grocery & Pharmacy", 
-               "11 Day Sliding Window of Percent Change in Visits to Retail & Recreation",
-               "11 Day Sliding Window of Social Distancing Scale", 
-               "11 Day Sliding Window of Quarantining Cases Scale", 
-               "11 Day Sliding Window of Restricting the Border Scale")
+titleList <- c("15 Day Sliding Window of Calculated R0",
+               "15 Day Sliding Window of Confirmed New Daily Cases",
+               "15 Day Sliding Window of Confirmed New Daily Deaths",
+               "15 Day Sliding Window of Percent Change in Visits to Residential Areas", 
+               "15 Day Sliding Window of Percent Change in Visits to Workplaces", 
+               "15 Day Sliding Window of Percent Change in Visits to Transit Stations",
+               "15 Day Sliding Window of Percent Change in Visits to Parks", 
+               "15 Day Sliding Window of Percent Change in Visits to Grocery & Pharmacy", 
+               "15 Day Sliding Window of Percent Change in Visits to Retail & Recreation",
+               "15 Day Sliding Window of Social Distancing Scale", 
+               "15 Day Sliding Window of Quarantining Cases Scale", 
+               "15 Day Sliding Window of Restricting the Border Scale")
 
-xxList <- c("Confirmed New Daily Cases",
+xxList <- c("R0",
+            "Confirmed New Daily Cases",
                "Confirmed New Daily Deaths",
                "Percent Change in Visits to Residential Areas", 
                "Percent Change in Visits to Workplaces", 
@@ -512,13 +535,28 @@ xxList <- c("Confirmed New Daily Cases",
                "Restricting the Border Scale")
 
 # for(n_n in 1:length(npiList)){
-for(n_n in 1:1){
+for(n_n in 2:3){
   print(n_n)
   print(npiList[n_n])
-  saveGIF({
-    for (d_d in 1:length(d_dRange)){
-      NPIplotAnimation(myNPI = npiList[n_n], myDate = d_dRange[d_d], title = titleList[n_n], xx = xxList[n_n])}
-  }, interval = .2, movie.name=paste0(npiList[n_n],".gif"),ani.width = 600, ani.height = 750)
+  if(n_n <=9){
+    if(n_n %in% c(2:3)){
+      saveGIF({
+        for (d_d in 1:length(d_dRange)){
+          NPIplotAnimation(myNPI = npiList[n_n], myDate = d_dRange[d_d], title = titleList[n_n], xx = xxList[n_n], both = both_sub_noUSA, windowSide = 7)}
+      }, interval = .2, movie.name=paste0("noUSA_",npiList[n_n],".gif"), ani.width = 700, ani.height = 1350, ani.res = 100)
+    }
+    saveGIF({
+      for (d_d in 1:length(d_dRange)){
+        NPIplotAnimation(myNPI = npiList[n_n], myDate = d_dRange[d_d], title = titleList[n_n], xx = xxList[n_n], both = both, windowSide = 7)}
+    }, interval = .2, movie.name=paste0(npiList[n_n],".gif"), ani.width = 700, ani.height = 1350, ani.res = 100)
+  }else{
+    saveGIF({
+      for (d_d in 1:length(d_dRange)){
+        NPIplotAnimation(myNPI = npiList[n_n], myDate = d_dRange[d_d], title = titleList[n_n], xx = xxList[n_n], both = both_sub, windowSide = 7)}
+    }, interval = .2, movie.name=paste0(npiList[n_n],".gif"), ani.width = 700, ani.height = 900, ani.res = 100)
+  }
+
+  closeAllConnections()
 }
 
 

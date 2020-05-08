@@ -26,7 +26,7 @@ library(zoo)
 
 
 # Update data?
-update_datasets()
+# update_datasets()
 
 # Explore the data
 data("coronavirus")
@@ -184,7 +184,7 @@ country_ts_lag <- create_lag(country_ts, num=10, incidence = incidence_flag)
 
 ## Creaint the full dataframe and saving the .csv file -----
 
-output_df <- create_COVID_ML_df(coronavirus, num_cases_min = 1000, num_lag = 20, incidence_flag = incidence_flag)   # to change from cases per million to total cases, change default value in function defined above (country_timeseries)
+output_df <- create_COVID_ML_df(coronavirus, num_cases_min = 1000, num_lag = 14, incidence_flag = incidence_flag)   # to change from cases per million to total cases, change default value in function defined above (country_timeseries)
 
 # if(HubeiFlag == T){
 #   output_df$Country <- as.character(output_df$Country)

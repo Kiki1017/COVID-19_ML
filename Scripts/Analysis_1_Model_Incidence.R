@@ -55,19 +55,12 @@ number_trees = 1000
 
 #---dataSetup---#########################################################################################################################################################################
 # read in raw data
-data_clean <- read.csv("./InputData/ML_features.csv")
-data_clean$date <- as.Date(data_clean$date)
-
-# Looking at the data
-glimpse(data_clean)
-summary(data_clean)
 
 # testing_countriesList <- c("USA","BRA","GBR","ZAF","BEL","DZA")
 testing_countriesList <- c("USA")
 # for(cc in 1:length(testing_countriesList)){
 cc=1
   
-    
   # Choose the testing country
   testing_countries <- c(testing_countriesList[cc])
   
@@ -80,6 +73,27 @@ cc=1
   training_countries_all <- c("ITA","GBR","ZAF","BRA","ESP","MYS","KOR","USA","SWE","AUT","CHE","DEU","FRA","DZA","IRN","CAN","TUR","BEL","ANT","PRT","ISR","RUS","NOR","IRL","AUS","IND","DNK","CHL","CZE","JPN","UKR","MAR","ARG","SGP","ROU")
     
   training_countries <- training_countries_all[which(training_countries_all != testing_countries)]
+  
+  data_clean <- read.csv("./InputData/ML_features.csv")
+  data_clean$date <- as.Date(data_clean$date)
+  data_clean1 <- subset(data_clean,ISO3 %in% testing_countries[1])
+  D4 <- max(data_clean1$date)
+  D3 <- data_clean1$date[which.min(abs(data_clean1$confirmed_cum_per_million - data_clean1$confirmed_cum_per_million[which(data_clean1$date == D4)]*2/3))]
+  D2 <- data_clean1$date[which.min(abs(data_clean1$confirmed_cum_per_million - data_clean1$confirmed_cum_per_million[which(data_clean1$date == D4)]*1/3))]
+  D1 <- data_clean1$date[which.min(abs(data_clean1$confirmed_cum_per_million - data_clean1$confirmed_cum_per_million[which(data_clean1$date == D4)]*1/10))]
+  print(D1)
+  print(D2)
+  print(D3)
+  print(D4)
+  
+  for(timeChop in c(D4,D3,D2,D1)){
+  data_clean <- read.csv("./InputData/ML_features.csv")
+  data_clean$date <- as.Date(data_clean$date)
+  data_clean <- subset(data_clean, date <= timeChop)
+  
+  # Looking at the data
+  glimpse(data_clean)
+  summary(data_clean)
   
   #---Estimating reproduction numbers, R0---#########################################################################################################################################################################
   # We are using the epiestim package to calculate the R0 for countries. This requires two things
@@ -153,6 +167,22 @@ cc=1
                        method="uncertain_si")
   
   #---trainingTestingDataFrames---#########################################################################################################################################################################
+# Subset training country list to those countries that had enough cases (to calc R0) by the start point
+  lengthClist <- length(training_countries)
+  training_countries_OG <- training_countries
+  for(i in 1:lengthClist){
+    training_subset <- subset(data_clean,ISO3 %in% training_countries_OG[i])
+    start <- which(training_subset$confirmed_cum_per_million >= incidence_start_point)[1]
+    if( is.na(start) == F){
+      training_subset_aligned <- training_subset[start:nrow(training_subset),]
+    }
+    if(nrow(training_subset_aligned)<16 | is.na(start)){
+      training_countries <- training_countries[which(training_countries != training_countries_OG[i])]
+    }else{
+      print(paste0(training_countries_OG[i],": ",nrow(training_subset_aligned)))
+    }
+  }
+
   # create training dataframe
   pdf("R0_plot.pdf",width = 11,height = 8.5)
   for(i in 1:length(training_countries)){
@@ -224,8 +254,10 @@ cc=1
       training_subset_aligned[[paste0(listToLag[npi],"_Lag_7")]] <- lag(training_subset_aligned[[paste0(listToLag[npi])]],7)
       training_subset_aligned[[paste0(listToLag[npi],"_Lag_7")]][1:7] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:5])
       # Add 14 day lag factor for R0
-      training_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]] <- lag(training_subset_aligned[[paste0(listToLag[npi])]],14)
-      training_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]][1:14] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:5])
+      # if(timeChop > "2020-04-10"){
+        training_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]] <- lag(training_subset_aligned[[paste0(listToLag[npi])]],14)
+        training_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]][1:14] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:5])
+      # }
     }
     
     plot.new()
@@ -304,8 +336,10 @@ cc=1
       testing_subset_aligned[[paste0(listToLag[npi],"_Lag_7")]] <- lag(testing_subset_aligned[[paste0(listToLag[npi])]],7)
       testing_subset_aligned[[paste0(listToLag[npi],"_Lag_7")]][1:7] <- testing_subset_aligned[[paste0(listToLag[npi])]][1]
       # Add 14 day lag factor for R0
-      testing_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]] <- lag(testing_subset_aligned[[paste0(listToLag[npi])]],14)
-      testing_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]][1:14] <- testing_subset_aligned[[paste0(listToLag[npi])]][1]
+      # if(timeChop > "2020-04-10"){
+        testing_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]] <- lag(testing_subset_aligned[[paste0(listToLag[npi])]],14)
+        testing_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]][1:14] <- testing_subset_aligned[[paste0(listToLag[npi])]][1]
+      # }
     }
     plot.new()
     plot(res_uncertain_si, legend = T)
@@ -456,32 +490,46 @@ cc=1
   bestMtry <- as.data.frame(bestMtry)
   mtry_best <- bestMtry$mtry[which.min(bestMtry$OOBError)]
   
-  # Run VSURF to get the top variables
-  results.vsurf <- VSURF(x,y,
-                         na.action = na.omit, 
-                         mtry = mtry_best, 
-                         n_tree = number_trees, 
-                         parallel = TRUE, 
-                         ncores = num_cores)
-  
-  # look at results of VSURF
-  summary(results.vsurf)
-  plot(results.vsurf)
-  results.vsurf$varselect.thres
-  results.vsurf$varselect.interp
-  results.vsurf$varselect.pred
-  
-  # print the reduced number of variables that should be considered in model
-  colnames(training_ready_sub2[,results.vsurf$varselect.thres])
-  colnames(training_ready_sub2[,results.vsurf$varselect.interp])
-  colnames(training_ready_sub2[,results.vsurf$varselect.pred])    # The final list of variables to be included according to the VSURF methodology.
-  
+  if(timeChop == D4){
+    # Run VSURF to get the top variables
+    results.vsurf <- VSURF(x,y,
+                           na.action = na.omit, 
+                           mtry = mtry_best, 
+                           n_tree = number_trees, 
+                           parallel = TRUE, 
+                           ncores = num_cores)
+    
+    # look at results of VSURF
+    summary(results.vsurf)
+    plot(results.vsurf)
+    results.vsurf$varselect.thres
+    results.vsurf$varselect.interp
+    results.vsurf$varselect.pred
+    
+    # print the reduced number of variables that should be considered in model
+    colnames(training_ready_sub2[,results.vsurf$varselect.thres])
+    colnames(training_ready_sub2[,results.vsurf$varselect.interp])
+    colnames(training_ready_sub2[,results.vsurf$varselect.pred])    # The final list of variables to be included according to the VSURF methodology.
+    VSURFkeepers <- colnames(training_ready_sub2[,results.vsurf$varselect.pred])
+    # Save the final list from D4 to be used for D3, D2, and D1
+    save(VSURFkeepers, paste0("./InputData/",testing_countries,VSURFkeepers.Rdata))
+  }
+  VSURFkeepers <- NULL
+  load(paste0("./InputData/",testing_countries,VSURFkeepers.Rdata))
   # training dataframe with reduced number of variables
-  training_ready_sub_vsurf_result = select(training_ready_sub2, c("confirmed_cum_per_million",colnames(training_ready_sub2[,results.vsurf$varselect.pred])))
+  if(length(VSURFkeepers) > 1){
+    training_ready_sub_vsurf_result = select(training_ready_sub2, c("confirmed_cum_per_million",VSURFkeepers))
+  }else{
+    training_ready_sub_vsurf_result = training_ready_sub2
+  }
   glimpse(training_ready_sub_vsurf_result)
   
   # testing dataframe with reduced number of variables
-  testing_ready_sub_vsurf_result = select(testing_ready, c("confirmed_cum_per_million",colnames(training_ready_sub2[,results.vsurf$varselect.pred])))
+  if(length(VSURFkeepers) > 1){
+    testing_ready_sub_vsurf_result = select(testing_ready_sub2, c("confirmed_cum_per_million",VSURFkeepers))
+  }else{
+    testing_ready_sub_vsurf_result = testing_ready_sub2[,names(training_ready_sub2)]
+  }
   glimpse(testing_ready_sub_vsurf_result)
   
   closeAllConnections()
@@ -550,7 +598,7 @@ cc=1
   # testing_ready$Social_Distancing
   # testing_ready_pred$Social_Distancing
   
-  
+  # testing_ready_pred
   #---makePrediction---#########################################################################################################################################################################
   p1 <- predict(best_model, testing_ready_pred[1:(breaker-1),], na.action = na.pass, n.trees = number_trees)
   # p1_tmp <- predictFunction(name=best_model, mod_name=model_name, dd=testing_ready_pred[1:(breaker-1),], n_trees = number_trees)
@@ -602,6 +650,11 @@ cc=1
   plot1Data$Actual <- as.numeric(plot1Data$Actual)
   plot1Data$country <- as.character(plot1Data$country)
   str(plot1Data)
+  hindsightAll <- read.csv("./InputData/ML_features.csv")
+  hindsightAll$date <- as.Date(hindsightAll$date)
+  hindsight <- subset(hindsightAll, ISO3 %in% testing_countries[1])
+  plot1Data <- merge(plot1Data, hindsight[,c("date","confirmed_cum_per_million")], by="date", all.x=T, all.y=T)
+  colnames(plot1Data) <- c("date", "country", "Actual", "Prediction", "Hindsight")
   
   # Reshape the data to be ready for ggplot
   m1 <- reshape2::melt(plot1Data,id=c("country","date"))
@@ -614,10 +667,12 @@ cc=1
   
   # Set the colors for red = actual, blue = prediction
   m1$date <- as.Date(m1$date)
-  predictColor <- rep("deepskyblue2",2)
-  alphabeticalList <- sort(c("Predict","Actual"))
+  predictColor <- rep("deepskyblue2",3)
+  alphabeticalList <- sort(c("Predict","Actual","Hindsight"))
   alphabeticalIndex <- which(alphabeticalList == "Actual")
   predictColor[alphabeticalIndex] <- "red"
+  alphabeticalIndex <- which(alphabeticalList == "Hindsight")
+  predictColor[alphabeticalIndex] <- "orange"
   
   # make the plot
   plot_predict <- ggplot() 
@@ -625,7 +680,9 @@ cc=1
     ggplot(aes(x = date, y = value, color = variable))+
     geom_glowing_line()
   plot_predict <- plot_predict +
-    geom_line(data=subset(m1, variable == "Prediction"), aes(x = date, y = value, group = variable, color = variable), size=2,alpha=.95,show.legend = T,linetype = "solid")
+    geom_line(data=subset(m1, variable == "Hindsight"), aes(x = date, y = value, group = variable, color = variable), size=1.5,alpha=.9,show.legend = T,linetype = "solid")
+  plot_predict <- plot_predict +
+    geom_line(data=subset(m1, variable == "Prediction"), aes(x = date, y = value, group = variable, color = variable), size=1.5,alpha=.95,show.legend = T,linetype = "solid")
   if(incidence_flag==T && death_flag==F){
     plot_predict <- plot_predict +
       labs(x=paste0("Days Since ",incidence_start_point," Cumulative Counts per Million"), y = "Confirmed Cumulative Cases per Million", title="")
@@ -829,6 +886,7 @@ cc=1
     labs(x=paste0("Days Since ",incidence_start_point," Cumulative Counts per Million"), y = "% Change From Baseline", title="")
   plot3 <- plot3 +
     guides(color=guide_legend(title="")) +
+    theme(legend.position="top") +
     theme(legend.title=element_text(size=14))+
     theme(axis.text.x = element_text(color="black",size = 13, angle = 0, hjust = .5, vjust = .5),
           axis.text.y = element_text(color="black",size = 13, angle = 0),
@@ -852,14 +910,34 @@ cc=1
   plot4_R0 <- subset(plot4Data, key %in% c("R0"))
   plot4_R0$key <- factor(plot4_R0$key, levels = c("Social_Distancing", "Quaranting_Cases", "Close_Border", "R0"), ordered = T)
   
-  colorsPlot4 <- c(brewer.pal(3, "Set2")[1:2],"red",brewer.pal(3, "Set2")[3])
-  plot4 <- ggplot() 
-  plot4 <- plot4_R0 %>%
-    ggplot(aes(x = date, y = value*5/(max(plot4_R0$value)), color = key))+
+  maxy <- ifelse((max(plot4_R0$value) > 10),10,max(plot4_R0$value))
+  plot5 <- plot4_R0 %>%
+    ggplot(aes(x = date, y = plot4_R0$value, color = key))+
     geom_glowing_line()+
-    labs(x=paste0("Days Since ",incidence_start_point," Cumulative Deaths per Million"), y = "R0", title="")
+    labs(x=paste0("Days Since ",incidence_start_point," Cumulative Deaths per Million"), y = "R0", title="")+
+    scale_colour_manual(values="red") +
+    scale_y_continuous(name = "R0",limits = c(0,maxy))+
+    geom_hline(yintercept=1, linetype="dashed", 
+               color = "black", size=2)+    theme(legend.title=element_text(size=14))+
+    theme(axis.text.x = element_text(color="black",size = 13, angle = 0, hjust = .5, vjust = .5),
+          axis.text.y = element_text(color="black",size = 13, angle = 0),
+          axis.title.x = element_text(color="black",size = 13, angle = 0),
+          axis.title.y = element_text(color="black",size = 13, angle = 90)
+    )+
+    guides(color=guide_legend(title="")) +
+    theme(legend.position="top") +
+    theme(legend.text=element_text(size=9))+
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          panel.background = element_blank(), axis.line = element_line(colour = "black"))
+  
+  colorsPlot4 <- c(brewer.pal(3, "Set2")[1:2],brewer.pal(3, "Set2")[3])
+  plot4 <- ggplot() 
+  # plot4 <- plot4_R0 %>%
+  #   ggplot(aes(x = date, y = value*5/(max(plot4_R0$value)), color = key))+
+  #   geom_glowing_line()+
+  #   labs(x=paste0("Days Since ",incidence_start_point," Cumulative Deaths per Million"), y = "R0", title="")
   plot4 <- plot4 +
-    geom_line(data=plot4_NPI, aes(x = date, y = value, group = key, color = key), size=1.5,alpha=.7,show.legend = F)
+    geom_line(data=plot4_NPI, aes(x = date, y = value, group = key, color = key), size=1.5,alpha=.9,show.legend = T)
   plot4 <- plot4 +
     guides(color=guide_legend(title="")) +
     theme(legend.title=element_text(size=14))+
@@ -870,11 +948,13 @@ cc=1
     )+
     # scale_x_continuous(breaks=seq(1, 10, 1))+
     # scale_colour_manual(values=randomColor(length(unique(plot3Data$key))), aesthetics = "colour") +
-    scale_y_continuous(name = "NPI Policy Scale", sec.axis = sec_axis(~./(5/(max(plot4_R0$value))), name = "R0"),limits = c(0,5))+
+    # scale_y_continuous(name = "NPI Policy Scale", sec.axis = sec_axis(~./(5/(max(plot4_R0$value))), name = "R0"),limits = c(0,5))+
+    scale_y_continuous(name = "NPI Policy Scale",limits = c(0,5))+
     scale_colour_manual(values=colorsPlot4, aesthetics = "colour") +
     theme(legend.text=element_text(size=9))+
     theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
           panel.background = element_blank(), axis.line = element_line(colour = "black"))+
+    theme(legend.position="top") +
     labs(x=NULL)
   
   #---variableImportance Plot---#########################################################################################################################################################################
@@ -902,10 +982,10 @@ cc=1
   
   #---cumulativePlot---#########################################################################################################################################################################
   rmsedf <- plot1Data[(breakpoint+1):(nrow(plot1Data)-forecastingTime),]
-  rmse_val <- sqrt( sum( (rmsedf$Prediction - rmsedf$Actual)^2 ,na.rm = T) / (nrow(rmsedf)) )
+  rmse_val <- sqrt( sum( (rmsedf$Prediction - rmsedf$Hindsight)^2 ,na.rm = T) / (length(rmsedf$Prediction[!is.na(rmsedf$Prediction)])) )
   rmse_val <- round(rmse_val,3)
-  gl <- list(plot1,plot2,plot_predict,plot_varimp,plot3,plot4)
-  pdf(paste0("./Output_CaseIncidence/finalPlot_",testing_countries[1],"_CaseIncidence.pdf"),width = 24, height = 24)
+  gl <- list(plot1,plot2,plot_predict,plot_varimp,plot3,plot4,plot5)
+  pdf(paste0("./Output_CaseIncidence/finalPlot_",testing_countries[1],"_",timeChop,"_CaseIncidence.pdf"),width = 24, height = 24)
   grid.arrange(grobs = gl, 
                top = textGrob(paste0(testing_ready$FullName[1],
                                      " ",
@@ -922,12 +1002,12 @@ cc=1
                                       c(2,2,2,2,5,5,5,5),
                                       c(2,2,2,2,5,5,5,5),
                                       c(2,2,2,2,5,5,5,5),
-                                      c(2,2,2,2,5,5,5,5),
+                                      c(2,2,2,2,6,6,6,6),
                                       c(3,3,3,3,6,6,6,6),
                                       c(3,3,3,3,6,6,6,6),
-                                      c(3,3,3,3,6,6,6,6),
-                                      c(3,3,3,3,6,6,6,6),
-                                      c(3,3,3,3,6,6,6,6)))
+                                      c(3,3,3,3,7,7,7,7),
+                                      c(3,3,3,3,7,7,7,7),
+                                      c(3,3,3,3,7,7,7,7)))
   dev.off()
   #
   # plot(best_model)
@@ -936,7 +1016,7 @@ cc=1
   #---Output variables for RShiny App---#########################################################################################################################################################################
 
   # Saving on object in RData format
-  save(plot1, plot_predict, plot2, plot3, plot4, best_model,  file = paste0("./COVID-19_Shiny_Web_App/Inputs/",testing_countries[1],"_CaseIncidence_Data.RData") )
+  save(plot1, plot_predict, plot2, plot3, plot4, best_model,  file = paste0("./COVID-19_Shiny_Web_App/Inputs/",testing_countries[1],"_",timeChop, "_CaseIncidence_Data.RData") )
   
 
 # }
@@ -962,6 +1042,7 @@ NPI_corrplot <- corrplot(NPI_google_cor_mat, method="circle", type="upper")
 
 dev.off()
 
+}
 # #---NPI Density Plots---#########################################################################################################################################################################
 # training_manipulate <- training_ready_OG
 # testing_manipulate <- testing_ready_OG
