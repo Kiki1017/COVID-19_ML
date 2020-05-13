@@ -285,11 +285,32 @@ for(i in 1:length(merge_all$FullName)){
   curName <- merge_all$FullName[i]
   if(curName %in% house$FullName){
     cursub <- subset(house, house$FullName==curName)
-    merge_all$Ave_household_size[i] <- as.numeric(cursub$Average_household_size[which(cursub$Date == max(cursub$Date,na.rm=T))])
-    merge_all$Percent_house_Nuclear[i] <- as.numeric(cursub$Nuclear[which(cursub$Date == max(cursub$Date,na.rm=T))])
-    merge_all$Percent_house_Multi_generation[i] <- as.numeric(cursub$Multi_generation[which(cursub$Date == max(cursub$Date,na.rm=T))])
-    merge_all$Percent_house_Three_generation[i] <- as.numeric(cursub$Three_generation[which(cursub$Date == max(cursub$Date,na.rm=T))])
-    merge_all$Percent_house_Skip_generation[i] <- as.numeric(cursub$Skip_generation[which(cursub$Date == max(cursub$Date,na.rm=T))])
+    cursub <- cursub[rev(order(cursub$Date)),]
+    rr=1
+    while(is.na(merge_all$Ave_household_size[i]) && rr <= nrow(cursub)){
+      merge_all$Ave_household_size[i] <- as.numeric(cursub$Average_household_size[rr])
+      rr <- rr+1
+    }
+    rr=1
+    while(is.na(merge_all$Percent_house_Nuclear[i]) && rr <= nrow(cursub)){
+      merge_all$Percent_house_Nuclear[i] <- as.numeric(cursub$Nuclear[rr])
+      rr <- rr+1
+    }
+    rr=1
+    while(is.na(merge_all$Percent_house_Multi_generation[i]) && rr <= nrow(cursub)){
+      merge_all$Percent_house_Multi_generation[i] <- as.numeric(cursub$Multi_generation[rr])
+      rr <- rr+1
+    }
+    rr=1
+    while(is.na(merge_all$Percent_house_Three_generation[i]) && rr <= nrow(cursub)){
+      merge_all$Percent_house_Three_generation[i] <- as.numeric(cursub$Three_generation[rr])
+      rr <- rr+1
+    }
+    rr=1
+    while(is.na(merge_all$Percent_house_Skip_generation[i]) && rr <= nrow(cursub)){
+      merge_all$Percent_house_Skip_generation[i] <- as.numeric(cursub$Skip_generation[rr])
+      rr <- rr+1
+    }
   }
 }
 

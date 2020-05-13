@@ -32,25 +32,27 @@ simpleCap <- function(x) {
 incidence_flag <- T
 # TRUE if you want to do deaths instead of cases
 death_flag <- F
-incidence_start_point <- 0.3
+incidence_start_point <- 0.1
 count_start_point <- 100
 # if we are doing deaths, we want incidence start point to be about 5.9% of the case one becuase that's the approx mortality rate
 if(death_flag==T){
   incidence_start_point <- incidence_start_point*(5.9/100)
   count_start_point <- count_start_point*(5.9/100)
 }
-
+VSURFflag <- F
 # the number of lag factors you want
 nLags <- 14
 # the time you want to forecast the predictiont
-forecastingTime <- 14
+# forecastingTime <- 14
+forecastingTimeFlag = "fullRange"
 # autofill the missing datapoints in NPI data
 NPIflag1 <- "autofill"
 # use the last NPI datapoints for the forecasting period
 NPIflag2 <- "lastNPI"
+# NPIflag2 <- "firstNPI"
 # The Percent of the timeframe you want to reserve for testing a country (the rest of that country's time series is included into the model)
 # for example if testingTimeFrame <- 0.8, then 20% of the timeseries will be used to train, and 80% will be used to predict
-testingTimeFrame <- .7
+testingTimeFrame <- 1
 # Number of cores to use when running rf model and vsurf
 num_cores = detectCores()
 # What NA acion to use for models
@@ -62,7 +64,8 @@ number_trees = 1000
 # read in raw data
 
 # testing_countriesList <- c("USA","BRA","GBR","ZAF","BEL","DZA")
-testing_countriesList <- c("USA","BRA","GBR")  
+# testing_countriesList <- c("USA","BRA","DEU","SGP")
+testing_countriesList <- c("USA")
 for(cc in 1:length(testing_countriesList)){
   # cc=1
   
@@ -85,16 +88,26 @@ for(cc in 1:length(testing_countriesList)){
   D4 <- data_clean1$date[which.max(data_clean1$confirmed_cum_per_million)]
   D3 <- data_clean1$date[which.min(abs(data_clean1$confirmed_cum_per_million - data_clean1$confirmed_cum_per_million[which(data_clean1$date == D4)]*2/3))]
   D2 <- data_clean1$date[which.min(abs(data_clean1$confirmed_cum_per_million - data_clean1$confirmed_cum_per_million[which(data_clean1$date == D4)]*1/3))]
-  D1 <- data_clean1$date[which.min(abs(data_clean1$confirmed_cum_per_million - data_clean1$confirmed_cum_per_million[which(data_clean1$date == D4)]*1/10))]
+  D1 <- data_clean1$date[which.min(abs(data_clean1$confirmed_cum_per_million - data_clean1$confirmed_cum_per_million[which(data_clean1$date == D4)]*1/7))]
+  # start <- which(data_clean1$confirmed_cum_per_million >= incidence_start_point)[1]
+  # if(D1 - data_clean1$date[start])
   print(D1)
   print(D2)
   print(D3)
   print(D4)
   
-  for(timeChop in c(D4,D3,D2,D1)){
-  # for(timeChop in c(D4)){
+  for(timeChop in as.Date(c(D4,D3,D2,D1))){
+  # for(timeChop in as.Date(c(D2,D1))){
+    if(forecastingTimeFlag == "fullRange"){
+      forecastingTime <- as.numeric(as.Date(D4)+14-as.Date(timeChop))
+    }else{
+      forecastingTime = 14
+    }
+    
+    
     data_clean <- read.csv("./InputData/ML_features.csv")
     data_clean$date <- as.Date(data_clean$date)
+    data_clean_train <- data_clean
     data_clean <- subset(data_clean, date <= timeChop)
     
     # Looking at the data
@@ -177,12 +190,12 @@ for(cc in 1:length(testing_countriesList)){
     lengthClist <- length(training_countries)
     training_countries_OG <- training_countries
     for(i in 1:lengthClist){
-      training_subset <- subset(data_clean,ISO3 %in% training_countries_OG[i])
+      training_subset <- subset(data_clean_train,ISO3 %in% training_countries_OG[i])
       start <- which(training_subset$confirmed_cum_per_million >= incidence_start_point)[1]
       if( is.na(start) == F){
         training_subset_aligned <- training_subset[start:nrow(training_subset),]
       }
-      if(nrow(training_subset_aligned)<16 | is.na(start)){
+      if(nrow(training_subset_aligned)<18 | is.na(start)){
         training_countries <- training_countries[which(training_countries != training_countries_OG[i])]
       }else{
         print(paste0(training_countries_OG[i],": ",nrow(training_subset_aligned)))
@@ -192,17 +205,9 @@ for(cc in 1:length(testing_countriesList)){
     # create training dataframe
     pdf("R0_plot.pdf",width = 11,height = 8.5)
     for(i in 1:length(training_countries)){
-      training_subset <- subset(data_clean,ISO3 %in% training_countries[i])
-      if(incidence_flag==T & death_flag == F){
-        start <- which(training_subset$confirmed_cum_per_million >= incidence_start_point)[1]
-      }else if(incidence_flag==T & death_flag == T){
-        start <- which(training_subset$death_cum_per_million >= incidence_start_point)[1]
-      }else if(incidence_flag==F & death_flag == F){
-        start <- which(training_subset$confirmed_cum >= count_start_point)[1]
-      }else if(incidence_flag==F & death_flag == T){
-        start <- which(training_subset$death_cum >= count_start_point)[1]
-      }
-      
+      training_subset <- subset(data_clean_train,ISO3 %in% training_countries[i])
+      start <- which(training_subset$confirmed_cum_per_million >= incidence_start_point)[1]
+
       training_subset_aligned <- training_subset[start:nrow(training_subset),]
       training_subset_aligned$time <- c(1:nrow(training_subset_aligned))
       
@@ -248,23 +253,54 @@ for(cc in 1:length(testing_countriesList)){
       training_subset_aligned$R0 <- NA 
       training_subset_aligned$R0[head(res_uncertain_si[["R"]]$`t_start`,1):tail(res_uncertain_si[["R"]]$`t_start`,1)] <- res_uncertain_si[["R"]]$`Mean(R)`
       # Autofill beginning R0s with first value
-      training_subset_aligned$R0[1:head(res_uncertain_si[["R"]]$`t_start`,1)] <- mean(head(res_uncertain_si[["R"]]$`Mean(R)`,5))
-      # Autofill ending R0s with last value
-      training_subset_aligned$R0[tail(res_uncertain_si[["R"]]$`t_start`,1):nrow(training_subset_aligned)] <- mean(tail(res_uncertain_si[["R"]]$`Mean(R)`,5))
+      training_subset_aligned$R0[1:head(res_uncertain_si[["R"]]$`t_start`,1)] <- mean(head(res_uncertain_si[["R"]]$`Mean(R)`,3))
+      # Autofill ending R0s with linear estimation from last week of values
+      fitFrame <- as.data.frame(cbind(c(1:7),tail(res_uncertain_si[["R"]]$`Mean(R)`,7)))
+      fit <- lm(V2~V1, data=fitFrame)
+      fitPred <- as.data.frame(8:(8+length(tail(res_uncertain_si[["R"]]$`t_start`,1):nrow(training_subset_aligned)))); colnames(fitPred) <- c("V1")
+      training_subset_aligned$R0[tail(res_uncertain_si[["R"]]$`t_start`,1):nrow(training_subset_aligned)] <- NA #predict.lm(fit,fitPred) #mean(tail(res_uncertain_si[["R"]]$`Mean(R)`,5))
       listToLag <- c("R0","Google_Retail_recreation","Google_Grocery_pharmacy","Google_Parks","Google_Transit_stations","Google_Workplaces","Google_Residential")
       for(npi in 1:length(listToLag)){
+        # Add 1 day lag factor for R0
+        training_subset_aligned[[paste0(listToLag[npi],"_Lag_1")]] <- lag(training_subset_aligned[[paste0(listToLag[npi])]],1)
+        training_subset_aligned[[paste0(listToLag[npi],"_Lag_1")]][1:1] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:3])
         # Add 3 day lag factor for R0
         training_subset_aligned[[paste0(listToLag[npi],"_Lag_3")]] <- lag(training_subset_aligned[[paste0(listToLag[npi])]],3)
-        training_subset_aligned[[paste0(listToLag[npi],"_Lag_3")]][1:3] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:5])
+        training_subset_aligned[[paste0(listToLag[npi],"_Lag_3")]][1:3] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:3])
+        # Add 5 day lag factor for R0
+        training_subset_aligned[[paste0(listToLag[npi],"_Lag_5")]] <- lag(training_subset_aligned[[paste0(listToLag[npi])]],5)
+        training_subset_aligned[[paste0(listToLag[npi],"_Lag_5")]][1:5] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:3])
         # Add 7 day lag factor for R0
         training_subset_aligned[[paste0(listToLag[npi],"_Lag_7")]] <- lag(training_subset_aligned[[paste0(listToLag[npi])]],7)
-        training_subset_aligned[[paste0(listToLag[npi],"_Lag_7")]][1:7] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:5])
+        training_subset_aligned[[paste0(listToLag[npi],"_Lag_7")]][1:7] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:3])
+        # Add 10 day lag factor for R0
+        training_subset_aligned[[paste0(listToLag[npi],"_Lag_10")]] <- lag(training_subset_aligned[[paste0(listToLag[npi])]],10)
+        training_subset_aligned[[paste0(listToLag[npi],"_Lag_10")]][1:10] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:3])
         # Add 14 day lag factor for R0
-        # if(timeChop > "2020-04-10"){
         training_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]] <- lag(training_subset_aligned[[paste0(listToLag[npi])]],14)
-        training_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]][1:14] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:5])
+        training_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]][1:14] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:3])
         # }
       }
+      # Fix lags for non-updated NPIs
+      training_subset_aligned$Social_Distancing[is.na(training_subset_aligned$Social_Distancing)] <- tail(training_subset_aligned$Social_Distancing[!is.na(training_subset_aligned$Social_Distancing)],1)
+      training_subset_aligned$Quaranting_Cases[is.na(training_subset_aligned$Quaranting_Cases)] <- tail(training_subset_aligned$Quaranting_Cases[!is.na(training_subset_aligned$Quaranting_Cases)],1)
+      training_subset_aligned$Close_Border[is.na(training_subset_aligned$Close_Border)] <- tail(training_subset_aligned$Close_Border[!is.na(training_subset_aligned$Close_Border)],1)
+      listToLag <- c("Social_Distancing","Quaranting_Cases","Close_Border")
+      for(npi in 1:length(listToLag)){
+        # Add 3 day lag factor
+        training_subset_aligned[[paste0(listToLag[npi],"_Lag_03")]] <- lag(training_subset_aligned[[paste0(listToLag[npi])]],3)
+        training_subset_aligned[[paste0(listToLag[npi],"_Lag_03")]][1:3] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:1])
+        # Add 7 day lag factor
+        training_subset_aligned[[paste0(listToLag[npi],"_Lag_07")]] <- lag(training_subset_aligned[[paste0(listToLag[npi])]],7)
+        training_subset_aligned[[paste0(listToLag[npi],"_Lag_07")]][1:7] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:1])
+        # Add 10 day lag factor
+        training_subset_aligned[[paste0(listToLag[npi],"_Lag_10")]] <- lag(training_subset_aligned[[paste0(listToLag[npi])]],10)
+        training_subset_aligned[[paste0(listToLag[npi],"_Lag_10")]][1:10] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:1])
+        # Add 14 day lag factor
+        training_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]] <- lag(training_subset_aligned[[paste0(listToLag[npi])]],14)
+        training_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]][1:14] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:1])
+      }
+      
       
       plot.new()
       plot(res_uncertain_si, legend = T)
@@ -278,16 +314,9 @@ for(cc in 1:length(testing_countriesList)){
     }
     # create testing dataframe
     for(i in 1:1){
+      # testing_subset <- subset(data_clean,ISO3 == testing_country)
+      # start <- which(testing_subset$confirmed_cum_per_million >= incidence_start_point)[1]
       testing_subset <- subset(data_clean,ISO3 == testing_country)
-      if(incidence_flag==T & death_flag == F){
-        start <- which(testing_subset$confirmed_cum_per_million >= incidence_start_point)[1]
-      }else if(incidence_flag==T & death_flag == T){
-        start <- which(testing_subset$death_cum_per_million >= incidence_start_point)[1]
-      }else if(incidence_flag==F & death_flag == F){
-        start <- which(testing_subset$confirmed_cum >= count_start_point)[1]
-      }else if(incidence_flag==F & death_flag == T){
-        start <- which(testing_subset$death_cum >= count_start_point)[1]
-      }
       testing_subset_aligned <- testing_subset[start:nrow(testing_subset),]
       
       # Smooth out incidence using moving average with a centered window of 7 datapoints (3 to the left, 3 to the right)
@@ -300,7 +329,7 @@ for(cc in 1:length(testing_countriesList)){
       gg <- ggplot(testing_subset_aligned) +
         geom_line(aes(x=date, y=confirmed),color="red") +
         geom_line(aes(x=date, y=movingAverage),color="blue") +
-        ggtitle(paste0("Reported cases in ", training_countries[i]))
+        ggtitle(paste0("Reported cases in ", testing_country))
       print(gg)
       # Add moving average day lag and one day difference variables
       testing_subset_aligned[["movingAverage_Lag_1"]] <- lag(testing_subset_aligned[["movingAverage"]],1)
@@ -326,32 +355,65 @@ for(cc in 1:length(testing_countriesList)){
       toCalcR0$I <- na.approx(toCalcR0$I)
       res_uncertain_si <- estimate_R(toCalcR0,
                                      method = "uncertain_si",
-                                     config = config)
+                                     config = config) 
       testing_subset_aligned$R0 <- NA 
       testing_subset_aligned$R0[head(res_uncertain_si[["R"]]$`t_start`,1):tail(res_uncertain_si[["R"]]$`t_start`,1)] <- res_uncertain_si[["R"]]$`Mean(R)`
       # Autofill beginning R0s with first value
-      testing_subset_aligned$R0[1:head(res_uncertain_si[["R"]]$`t_start`,1)] <- mean(head(res_uncertain_si[["R"]]$`Mean(R)`,5))
-      # Autofill ending R0s with last value
-      testing_subset_aligned$R0[tail(res_uncertain_si[["R"]]$`t_start`,1):nrow(testing_subset_aligned)] <- mean(tail(res_uncertain_si[["R"]]$`Mean(R)`,5))
+      testing_subset_aligned$R0[1:head(res_uncertain_si[["R"]]$`t_start`,1)] <- mean(head(res_uncertain_si[["R"]]$`Mean(R)`,3))
+      # Autofill ending R0s with linear estimation from last week of values
+      fitFrame <- as.data.frame(cbind(c(1:7),tail(res_uncertain_si[["R"]]$`Mean(R)`,7)))
+      fit <- lm(V2~V1, data=fitFrame)
+      fitPred <- as.data.frame(8:(8+length(tail(res_uncertain_si[["R"]]$`t_start`,1):nrow(testing_subset_aligned)))); colnames(fitPred) <- c("V1")
+      addToBreaker <- nrow(fitPred)
+      testing_subset_aligned$R0[tail(res_uncertain_si[["R"]]$`t_start`,1):nrow(testing_subset_aligned)] <- NA #predict.lm(fit,fitPred) #mean(tail(res_uncertain_si[["R"]]$`Mean(R)`,5))
       listToLag <- c("R0","Google_Retail_recreation","Google_Grocery_pharmacy","Google_Parks","Google_Transit_stations","Google_Workplaces","Google_Residential")
       for(npi in 1:length(listToLag)){
+        # Add 1 day lag factor for R0
+        testing_subset_aligned[[paste0(listToLag[npi],"_Lag_1")]] <- lag(testing_subset_aligned[[paste0(listToLag[npi])]],1)
+        testing_subset_aligned[[paste0(listToLag[npi],"_Lag_1")]][1:1] <- mean(testing_subset_aligned[[paste0(listToLag[npi])]][1:1])
         # Add 3 day lag factor for R0
         testing_subset_aligned[[paste0(listToLag[npi],"_Lag_3")]] <- lag(testing_subset_aligned[[paste0(listToLag[npi])]],3)
-        testing_subset_aligned[[paste0(listToLag[npi],"_Lag_3")]][1:3] <- testing_subset_aligned[[paste0(listToLag[npi])]][1]
+        testing_subset_aligned[[paste0(listToLag[npi],"_Lag_3")]][1:3] <- mean(testing_subset_aligned[[paste0(listToLag[npi])]][1:3])
+        # Add 5 day lag factor for R0
+        testing_subset_aligned[[paste0(listToLag[npi],"_Lag_5")]] <- lag(testing_subset_aligned[[paste0(listToLag[npi])]],5)
+        testing_subset_aligned[[paste0(listToLag[npi],"_Lag_5")]][1:5] <- mean(testing_subset_aligned[[paste0(listToLag[npi])]][1:5])
         # Add 7 day lag factor for R0
         testing_subset_aligned[[paste0(listToLag[npi],"_Lag_7")]] <- lag(testing_subset_aligned[[paste0(listToLag[npi])]],7)
-        testing_subset_aligned[[paste0(listToLag[npi],"_Lag_7")]][1:7] <- testing_subset_aligned[[paste0(listToLag[npi])]][1]
+        testing_subset_aligned[[paste0(listToLag[npi],"_Lag_7")]][1:7] <- mean(testing_subset_aligned[[paste0(listToLag[npi])]][1:7])
+        # Add 10 day lag factor for R0
+        testing_subset_aligned[[paste0(listToLag[npi],"_Lag_10")]] <- lag(testing_subset_aligned[[paste0(listToLag[npi])]],10)
+        testing_subset_aligned[[paste0(listToLag[npi],"_Lag_10")]][1:10] <- mean(testing_subset_aligned[[paste0(listToLag[npi])]][1:10])
         # Add 14 day lag factor for R0
-        # if(timeChop > "2020-04-10"){
         testing_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]] <- lag(testing_subset_aligned[[paste0(listToLag[npi])]],14)
-        testing_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]][1:14] <- testing_subset_aligned[[paste0(listToLag[npi])]][1]
+        testing_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]][1:14] <- mean(testing_subset_aligned[[paste0(listToLag[npi])]][1:14])
         # }
       }
+      # Fix lags for non-updated NPIs
+      testing_subset_aligned$Social_Distancing[is.na(testing_subset_aligned$Social_Distancing)] <- tail(testing_subset_aligned$Social_Distancing[!is.na(testing_subset_aligned$Social_Distancing)],1)
+      testing_subset_aligned$Quaranting_Cases[is.na(testing_subset_aligned$Quaranting_Cases)] <- tail(testing_subset_aligned$Quaranting_Cases[!is.na(testing_subset_aligned$Quaranting_Cases)],1)
+      testing_subset_aligned$Close_Border[is.na(testing_subset_aligned$Close_Border)] <- tail(testing_subset_aligned$Close_Border[!is.na(testing_subset_aligned$Close_Border)],1)
+      listToLag <- c("Social_Distancing","Quaranting_Cases","Close_Border")
+      for(npi in 1:length(listToLag)){
+        # Add 3 day lag factor
+        testing_subset_aligned[[paste0(listToLag[npi],"_Lag_03")]] <- lag(testing_subset_aligned[[paste0(listToLag[npi])]],3)
+        testing_subset_aligned[[paste0(listToLag[npi],"_Lag_03")]][1:3] <- mean(testing_subset_aligned[[paste0(listToLag[npi])]][1:1])
+        # Add 7 day lag factor
+        testing_subset_aligned[[paste0(listToLag[npi],"_Lag_07")]] <- lag(testing_subset_aligned[[paste0(listToLag[npi])]],7)
+        testing_subset_aligned[[paste0(listToLag[npi],"_Lag_07")]][1:7] <- mean(testing_subset_aligned[[paste0(listToLag[npi])]][1:1])
+        # Add 10 day lag factor
+        testing_subset_aligned[[paste0(listToLag[npi],"_Lag_10")]] <- lag(testing_subset_aligned[[paste0(listToLag[npi])]],10)
+        testing_subset_aligned[[paste0(listToLag[npi],"_Lag_10")]][1:10] <- mean(testing_subset_aligned[[paste0(listToLag[npi])]][1:1])
+        # Add 14 day lag factor
+        testing_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]] <- lag(testing_subset_aligned[[paste0(listToLag[npi])]],14)
+        testing_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]][1:14] <- mean(testing_subset_aligned[[paste0(listToLag[npi])]][1:1])
+      }
+      
+      
       plot.new()
       plot(res_uncertain_si, legend = T)
-      mtext(training_countries[i], outer=TRUE,  cex=1, line=-.5)
+      mtext(testing_country, outer=TRUE,  cex=1, line=-.5)
       
-      tmp <- testing_subset_aligned[1:forecastingTime,]
+      tmp <- testing_subset_aligned[rep(1,forecastingTime),]
       tmp[,grep("cum|Social_Distancing|Quaranting_Cases|Close_Border|Google|R0|date|confirmed", colnames(tmp))] <- NA
       tmp$Social_Distancing <- NA
       tmp$Quaranting_Cases <- NA
@@ -359,11 +421,7 @@ for(cc in 1:length(testing_countriesList)){
       testing_subset_aligned_predictNA <- rbind(testing_subset_aligned,tmp)
       testing_subset_aligned_predictNA$time <- c(1:nrow(testing_subset_aligned_predictNA))
       
-      if(i==1){
-        testing_ready <- testing_subset_aligned_predictNA
-      }else{
-        testing_ready <- as.data.frame(rbind(testing_ready,testing_subset_aligned_predictNA))
-      }
+      testing_ready <- testing_subset_aligned_predictNA
     }
     dev.off()
     
@@ -386,53 +444,10 @@ for(cc in 1:length(testing_countriesList)){
     # NPIflag1 <- "autofill"
     
     peek_at_NPIs_training1 <- training_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(training_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(training_ready))])]
-    NPInames <- names(training_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(training_ready))]
-    # View(training_ready[,c(NPInames)])
-    counter <- 1
-    prevcountry <- training_ready$Country.x[1]
-    if(NPIflag1 == "autofill"){
-      for(i in 2:nrow(training_ready)){
-        curcountry <- training_ready$Country.x[i]
-        if(curcountry == prevcountry){
-          counter <- counter+1
-        }else{
-          counter <- 1
-        }
-        
-        for(j in NPInames){
-          if(is.na(training_ready[[j]][i]) && counter > 14){
-            training_ready[[j]][i] <- training_ready[[j]][i-1]
-          }
-        }
-        prevcountry <- curcountry
-      }
-    }
-    peek_at_NPIs_training2 <- training_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(training_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(training_ready))])]
-    
-    
+    breaker <- nrow(testing_ready)-forecastingTime+1-addToBreaker #breaker for R0
+    breaker2 <- nrow(testing_ready)-forecastingTime+1 #breaker for all of the NPIs for our cutoff date
     peek_at_NPIs_testing1 <- testing_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(testing_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(testing_ready))])]
-    NPInames <- names(testing_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(testing_ready))]
-    # counter <- 1
-    # prevcountry <- testing_ready$Country.x[1]
-    if(NPIflag1 == "autofill"){
-      for(i in 2:nrow(testing_ready)){
-        # curcountry <- testing_ready$Country.x[i]
-        # if(curcountry == prevcountry){
-        #   counter <- counter+1
-        # }else{
-        #   counter <- 1
-        # }
-        
-        for(j in NPInames){
-          if(is.na(testing_ready[[j]][i])){
-            testing_ready[[j]][i] <- testing_ready[[j]][i-1]
-          }
-        }
-        # prevcountry <- curcountry
-      }
-    }
-    peek_at_NPIs_testing2 <- testing_ready[,c(c("date","time","Country.x","ISO3","confirmed"),names(testing_ready)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google|R0",names(testing_ready))])]
-    
+    tail(peek_at_NPIs_testing1[1:breaker])
     #---Filtering Columns in Dataframes---#########################################################################################################################################################################
     # Columns you don't want to be in the model
     listToRemove <- c("date",
@@ -451,7 +466,11 @@ for(cc in 1:length(testing_countriesList)){
                       "movingAverage_Lag_7",
                       "movingAverage_Lag_14",
                       "lag_01_cut",
-                      "time"
+                      "time",
+                      "R0_Lag_1"
+                      # 'R0_Lag_3',
+                      # 'R0_Lag_7',
+                      # "R0_Lag_14"
     )
     
     # filter training data
@@ -481,12 +500,13 @@ for(cc in 1:length(testing_countriesList)){
       mutate_if(is.integer,as.numeric)
     
     #---VSURF Variable Selection---#########################################################################################################################################################################
-    if(timeChop == D4){
+    outcomeVariable <- "R0"
+    mod_formula <- as.formula(paste(outcomeVariable,"~","."))
+    if(timeChop == D4 && VSURFflag == T){
       print(paste0('Number of cores being used = ',num_cores, ", of possible ", detectCores()," cores"))
       
       registerDoParallel(num_cores)
-      outcomeVariable <- "R0"
-      mod_formula <- as.formula(paste(outcomeVariable,"~","."))
+
       
       set.seed(15)
       
@@ -676,172 +696,310 @@ for(cc in 1:length(testing_countriesList)){
       return(predict_tmp)
     }
     
+    #---Hindsight---#########################################################################################################################################################################
+    hindsightAll <- read.csv("./InputData/ML_features.csv")
+    hindsightAll$date <- as.Date(hindsightAll$date)
+      for(i in 1:1){
+        hindsight_subset <- subset(hindsightAll,ISO3 == testing_country)
+        start <- which(hindsight_subset$confirmed_cum_per_million >= incidence_start_point)[1]
+        # hindsight_subset <- subset(data_clean,ISO3 == hindsight_country)
+        hindsight_subset_aligned <- hindsight_subset[start:nrow(hindsight_subset),]
+        
+        # Smooth out incidence using moving average with a centered window of 7 datapoints (3 to the left, 3 to the right)
+        # make sure the window is an odd integer
+        window <- 7
+        # dim(hindsight_subset_aligned)
+        # length(rollmean(hindsight_subset_aligned$confirmed, k=window))
+        hindsight_subset_aligned$movingAverage <- c(hindsight_subset_aligned$confirmed[1:((window-1)/2)],rollmean(hindsight_subset_aligned$confirmed, k=window, align = "center"),hindsight_subset_aligned$confirmed[(nrow(hindsight_subset_aligned)-((window-1)/2)+1):nrow(hindsight_subset_aligned)])
+        # Plot cases
+        gg <- ggplot(hindsight_subset_aligned) +
+          geom_line(aes(x=date, y=confirmed),color="red") +
+          geom_line(aes(x=date, y=movingAverage),color="blue") +
+          ggtitle(paste0("Reported cases in ", testing_country))
+        print(gg)
+        # Add moving average day lag and one day difference variables
+        hindsight_subset_aligned[["movingAverage_Lag_1"]] <- lag(hindsight_subset_aligned[["movingAverage"]],1)
+        hindsight_subset_aligned[["movingAverage_Lag_3"]] <- lag(hindsight_subset_aligned[["movingAverage"]],3)
+        hindsight_subset_aligned[["movingAverage_Lag_7"]] <- lag(hindsight_subset_aligned[["movingAverage"]],7)
+        hindsight_subset_aligned[["movingAverage_Lag_14"]] <- lag(hindsight_subset_aligned[["movingAverage"]],14)
+        hindsight_subset_aligned[["movingAverage_diff_1_3"]] <- hindsight_subset_aligned[["movingAverage_Lag_1"]] - hindsight_subset_aligned[["movingAverage_Lag_3"]]
+        hindsight_subset_aligned[["movingAverage_diff_1_7"]] <- hindsight_subset_aligned[["movingAverage_Lag_1"]] - hindsight_subset_aligned[["movingAverage_Lag_7"]]
+        hindsight_subset_aligned[["movingAverage_diff_1_14"]] <- hindsight_subset_aligned[["movingAverage_Lag_1"]] - hindsight_subset_aligned[["movingAverage_Lag_14"]]
+        hindsight_subset_aligned[["movingAverage_diff_3_7"]] <- hindsight_subset_aligned[["movingAverage_Lag_3"]] - hindsight_subset_aligned[["movingAverage_Lag_7"]]
+        hindsight_subset_aligned[["movingAverage_diff_7_14"]] <- hindsight_subset_aligned[["movingAverage_Lag_7"]] - hindsight_subset_aligned[["movingAverage_Lag_14"]]
+        
+        # toCalcR0 <- hindsight_subset_aligned[,c("date","confirmed")]
+        toCalcR0 <- hindsight_subset_aligned[,c("date","movingAverage")]
+        colnames(toCalcR0) <- c("dates","I")
+        toCalcR0$I[toCalcR0$I<0] <- NA
+        #Get of erroneous negative counts... they sneak throught the API sometimes. 
+        # But if thre is a negative at teh end... are the last one lets just make it equal to the n-1 one
+        if(is.na(tail(toCalcR0$I,1))){
+          toCalcR0$I[length(toCalcR0$I)] <- toCalcR0$I[length(toCalcR0$I)-1]
+        }
+        # If the NA is not at the end, Lets linearly interpolate them:
+        toCalcR0$I <- na.approx(toCalcR0$I)
+        res_uncertain_si <- estimate_R(toCalcR0,
+                                       method = "uncertain_si",
+                                       config = config) 
+        hindsight_subset_aligned$R0 <- NA 
+        hindsight_subset_aligned$R0[head(res_uncertain_si[["R"]]$`t_start`,1):tail(res_uncertain_si[["R"]]$`t_start`,1)] <- res_uncertain_si[["R"]]$`Mean(R)`
+        # Autofill beginning R0s with first value
+        hindsight_subset_aligned$R0[1:head(res_uncertain_si[["R"]]$`t_start`,1)] <- mean(head(res_uncertain_si[["R"]]$`Mean(R)`,3))
+        # Autofill ending R0s with linear estimation from last week of values
+        fitFrame <- as.data.frame(cbind(c(1:7),tail(res_uncertain_si[["R"]]$`Mean(R)`,7)))
+        fit <- lm(V2~V1, data=fitFrame)
+        fitPred <- as.data.frame(8:(8+length(tail(res_uncertain_si[["R"]]$`t_start`,1):nrow(hindsight_subset_aligned)))); colnames(fitPred) <- c("V1")
+        addToBreaker <- nrow(fitPred)
+        hindsight_subset_aligned$R0[tail(res_uncertain_si[["R"]]$`t_start`,1):nrow(hindsight_subset_aligned)] <- NA #predict.lm(fit,fitPred) #mean(tail(res_uncertain_si[["R"]]$`Mean(R)`,5))
+        listToLag <- c("R0","Google_Retail_recreation","Google_Grocery_pharmacy","Google_Parks","Google_Transit_stations","Google_Workplaces","Google_Residential")
+        for(npi in 1:length(listToLag)){
+          # Add 1 day lag factor for R0
+          hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_1")]] <- lag(hindsight_subset_aligned[[paste0(listToLag[npi])]],1)
+          hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_1")]][1:1] <- mean(hindsight_subset_aligned[[paste0(listToLag[npi])]][1:1])
+          # Add 3 day lag factor for R0
+          hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_3")]] <- lag(hindsight_subset_aligned[[paste0(listToLag[npi])]],3)
+          hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_3")]][1:3] <- mean(hindsight_subset_aligned[[paste0(listToLag[npi])]][1:3])
+          # Add 5 day lag factor for R0
+          hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_5")]] <- lag(hindsight_subset_aligned[[paste0(listToLag[npi])]],5)
+          hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_5")]][1:5] <- mean(hindsight_subset_aligned[[paste0(listToLag[npi])]][1:5])
+          # Add 7 day lag factor for R0
+          hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_7")]] <- lag(hindsight_subset_aligned[[paste0(listToLag[npi])]],7)
+          hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_7")]][1:7] <- mean(hindsight_subset_aligned[[paste0(listToLag[npi])]][1:7])
+          # Add 10 day lag factor for R0
+          hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_10")]] <- lag(hindsight_subset_aligned[[paste0(listToLag[npi])]],10)
+          hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_10")]][1:10] <- mean(hindsight_subset_aligned[[paste0(listToLag[npi])]][1:10])
+          # Add 14 day lag factor for R0
+          hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]] <- lag(hindsight_subset_aligned[[paste0(listToLag[npi])]],14)
+          hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]][1:14] <- mean(hindsight_subset_aligned[[paste0(listToLag[npi])]][1:14])
+          # }
+        }
+        # Fix lags for non-updated NPIs
+        hindsight_subset_aligned$Social_Distancing[is.na(hindsight_subset_aligned$Social_Distancing)] <- tail(hindsight_subset_aligned$Social_Distancing[!is.na(hindsight_subset_aligned$Social_Distancing)],1)
+        hindsight_subset_aligned$Quaranting_Cases[is.na(hindsight_subset_aligned$Quaranting_Cases)] <- tail(hindsight_subset_aligned$Quaranting_Cases[!is.na(hindsight_subset_aligned$Quaranting_Cases)],1)
+        hindsight_subset_aligned$Close_Border[is.na(hindsight_subset_aligned$Close_Border)] <- tail(hindsight_subset_aligned$Close_Border[!is.na(hindsight_subset_aligned$Close_Border)],1)
+        listToLag <- c("Social_Distancing","Quaranting_Cases","Close_Border")
+        for(npi in 1:length(listToLag)){
+          # Add 3 day lag factor
+          hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_03")]] <- lag(hindsight_subset_aligned[[paste0(listToLag[npi])]],3)
+          hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_03")]][1:3] <- mean(hindsight_subset_aligned[[paste0(listToLag[npi])]][1:1])
+          # Add 7 day lag factor
+          hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_07")]] <- lag(hindsight_subset_aligned[[paste0(listToLag[npi])]],7)
+          hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_07")]][1:7] <- mean(hindsight_subset_aligned[[paste0(listToLag[npi])]][1:1])
+          # Add 10 day lag factor
+          hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_10")]] <- lag(hindsight_subset_aligned[[paste0(listToLag[npi])]],10)
+          hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_10")]][1:10] <- mean(hindsight_subset_aligned[[paste0(listToLag[npi])]][1:1])
+          # Add 14 day lag factor
+          hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]] <- lag(hindsight_subset_aligned[[paste0(listToLag[npi])]],14)
+          hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]][1:14] <- mean(hindsight_subset_aligned[[paste0(listToLag[npi])]][1:1])
+        }
+        
+        
+        plot.new()
+        plot(res_uncertain_si, legend = T)
+        mtext(testing_country, outer=TRUE,  cex=1, line=-.5)
+        
+        tmp <- testing_subset_aligned[rep(1,forecastingTime),]
+        tmp[,grep("cum|Social_Distancing|Quaranting_Cases|Close_Border|Google|R0|date|confirmed", colnames(tmp))] <- NA
+        tmp$Social_Distancing <- NA
+        tmp$Quaranting_Cases <- NA
+        tmp$Close_Border <- NA
+        hindsight_subset_aligned_predictNA <- rbind(hindsight_subset_aligned,tmp)
+        hindsight_subset_aligned_predictNA$time <- c(1:nrow(hindsight_subset_aligned_predictNA))
+        
+        if(i==1){
+          hindsight_ready <- hindsight_subset_aligned_predictNA
+        }else{
+          hindsight_ready <- as.data.frame(rbind(hindsight_ready,hindsight_subset_aligned_predictNA))
+        }
+      }
+    
+    
     #---NPIflag2---#########################################################################################################################################################################
     # setting the NPIflag2 to "lastNPI" is our method of saying that we want to fill all the NAs in the forecasting period with the last empirical time points' NPI values
     # NPIflag2 <- "lastNPI"
-    testing_ready_pred <- testing_ready_sub_vsurf_result
-    
-    breaker <- nrow(testing_ready_pred)-forecastingTime+1
-    # testing_ready_pred[(breaker-1):(breaker+1),grep("confirmed_cum_per_million", colnames(testing_ready_pred))]
-    
-    # Note this code assumes that there are no NAs present in the NPI data
-    NPInames <- names(testing_ready_pred)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google",names(testing_ready_pred))]
-    if(NPIflag2 == "lastNPI"){
+    # scenario <- 1
+    for(scenario in c(1:4)){
+      testing_ready_pred <- testing_ready_sub_vsurf_result
+      DFtoBuildLags <- testing_ready_sub2[,c("Google_Retail_recreation", "Google_Grocery_pharmacy", "Google_Parks", "Google_Transit_stations", "Google_Workplaces", "Google_Residential",
+                                             "Social_Distancing", "Quaranting_Cases", "Close_Border")]
+      breaker <- nrow(testing_ready_pred)-forecastingTime+1-addToBreaker #breaker for R0
+      breaker2 <- nrow(testing_ready_pred)-forecastingTime+1 #breaker for all of the NPIs for our cutoff date
+      
+      NPInames <- names(testing_ready_pred)[grep("Social_Distancing|Quaranting_Cases|Close_Border|Google",names(testing_ready_pred))]
+      NPInamesMain <- NPInames[grep("lag|Lag",NPInames,invert=T)]
+      NPInamesLag <- NPInames[grep("lag|Lag",NPInames,invert=F)]
+      
+      # Scenario 1: The country keeps doing what they are currently doing
+      DFtoBuildLagsScenario1 <- DFtoBuildLags
+      for(j in colnames(DFtoBuildLagsScenario1)){  
+        for(i in breaker:nrow(DFtoBuildLagsScenario1)){
+          if(length(grep("Google",j)) >= 1){
+            if(i == breaker){
+              miny <- mean(DFtoBuildLagsScenario1[[j]][(i-3):(i-1)]) - 5
+              maxy <- mean(DFtoBuildLagsScenario1[[j]][(i-3):(i-1)]) + 5
+            }
+            DFtoBuildLagsScenario1[[j]][i] <- as.integer(runif(1, min = miny, max = maxy))
+          }else{
+            DFtoBuildLagsScenario1[[j]][i] <- DFtoBuildLagsScenario1[[j]][i-1]
+          }
+        }
+      }
+  
+      # Scenario 2: The country opens things up like they were Pre-COVID
+      DFtoBuildLagsScenario2 <- DFtoBuildLags
+      DFtoBuildLagsScenario2$Google_Retail_recreation[breaker:nrow(DFtoBuildLagsScenario2)] <- as.integer(runif(length(breaker:nrow(DFtoBuildLagsScenario2)), min = -5, max = 5))
+      DFtoBuildLagsScenario2$Google_Grocery_pharmacy[breaker:nrow(DFtoBuildLagsScenario2)] <- as.integer(runif(length(breaker:nrow(DFtoBuildLagsScenario2)), min = -5, max = 5))
+      DFtoBuildLagsScenario2$Google_Parks[breaker:nrow(DFtoBuildLagsScenario2)] <- as.integer(runif(length(breaker:nrow(DFtoBuildLagsScenario2)), min = -5, max = 5))
+      DFtoBuildLagsScenario2$Google_Transit_stations[breaker:nrow(DFtoBuildLagsScenario2)] <- as.integer(runif(length(breaker:nrow(DFtoBuildLagsScenario2)), min = -5, max = 5))
+      DFtoBuildLagsScenario2$Google_Workplaces[breaker:nrow(DFtoBuildLagsScenario2)] <- as.integer(runif(length(breaker:nrow(DFtoBuildLagsScenario2)), min = -5, max = 5))
+      DFtoBuildLagsScenario2$Google_Residential[breaker:nrow(DFtoBuildLagsScenario2)] <- as.integer(runif(length(breaker:nrow(DFtoBuildLagsScenario2)), min = -5, max = 5))
+      DFtoBuildLagsScenario2$Social_Distancing[breaker:nrow(DFtoBuildLagsScenario2)] <- 0
+      DFtoBuildLagsScenario2$Quaranting_Cases[breaker:nrow(DFtoBuildLagsScenario2)] <- 0
+      DFtoBuildLagsScenario2$Close_Border[breaker:nrow(DFtoBuildLagsScenario2)] <- 0
+      
+      # Scenario 3: The country closes everything down to it's most extreme
+      # Empirically upper thresholds for google data are 80-90% and then for residential google is around 40-50%
+      # Intervention measures are set to their max values
+      DFtoBuildLagsScenario3 <- DFtoBuildLags
+      DFtoBuildLagsScenario3$Google_Retail_recreation[breaker:nrow(DFtoBuildLagsScenario3)] <- as.integer(runif(length(breaker:nrow(DFtoBuildLagsScenario3)), min = -90, max = -80))
+      DFtoBuildLagsScenario3$Google_Grocery_pharmacy[breaker:nrow(DFtoBuildLagsScenario3)] <- as.integer(runif(length(breaker:nrow(DFtoBuildLagsScenario3)), min = -90, max = -80))
+      DFtoBuildLagsScenario3$Google_Parks[breaker:nrow(DFtoBuildLagsScenario3)] <- as.integer(runif(length(breaker:nrow(DFtoBuildLagsScenario3)), min = -90, max = -80))
+      DFtoBuildLagsScenario3$Google_Transit_stations[breaker:nrow(DFtoBuildLagsScenario3)] <- as.integer(runif(length(breaker:nrow(DFtoBuildLagsScenario3)), min = -90, max = -80))
+      DFtoBuildLagsScenario3$Google_Workplaces[breaker:nrow(DFtoBuildLagsScenario3)] <- as.integer(runif(length(breaker:nrow(DFtoBuildLagsScenario3)), min = -90, max = -80))
+      DFtoBuildLagsScenario3$Google_Residential[breaker:nrow(DFtoBuildLagsScenario3)] <- as.integer(runif(length(breaker:nrow(DFtoBuildLagsScenario3)), min = 40, max = 50))
+      DFtoBuildLagsScenario3$Social_Distancing[breaker:nrow(DFtoBuildLagsScenario3)] <- 5
+      DFtoBuildLagsScenario3$Quaranting_Cases[breaker:nrow(DFtoBuildLagsScenario3)] <- 3
+      DFtoBuildLagsScenario3$Close_Border[breaker:nrow(DFtoBuildLagsScenario3)] <- 4
+      
+      # Scenario 4: Custom, choose your own values
+      Google_Retail_recreation_Custom <- -40
+      Google_Grocery_pharmacy_Custom <- -5
+      Google_Parks_Custom <- 10
+      Google_Transit_stations_Custom <- -10
+      Google_Workplaces_Custom <- -30
+      Google_Residential_Custom <- +30
+      Social_Distancing_Custom <- 3
+      Quaranting_Cases_Custom <- 2
+      Close_Border_Custom <- 2
+      DFtoBuildLagsScenario4 <- DFtoBuildLags
+      DFtoBuildLagsScenario4$Google_Retail_recreation[breaker:nrow(DFtoBuildLagsScenario4)] <- as.integer(runif(length(breaker:nrow(DFtoBuildLagsScenario4)), min = Google_Retail_recreation_Custom-5, max = Google_Retail_recreation_Custom+5))
+      DFtoBuildLagsScenario4$Google_Grocery_pharmacy[breaker:nrow(DFtoBuildLagsScenario4)] <- as.integer(runif(length(breaker:nrow(DFtoBuildLagsScenario4)), min = Google_Grocery_pharmacy_Custom-5, max = Google_Grocery_pharmacy_Custom+5))
+      DFtoBuildLagsScenario4$Google_Parks[breaker:nrow(DFtoBuildLagsScenario4)] <- as.integer(runif(length(breaker:nrow(DFtoBuildLagsScenario4)), min = Google_Parks_Custom-5, max = Google_Parks_Custom+5))
+      DFtoBuildLagsScenario4$Google_Transit_stations[breaker:nrow(DFtoBuildLagsScenario4)] <- as.integer(runif(length(breaker:nrow(DFtoBuildLagsScenario4)), min = Google_Transit_stations_Custom-5, max = Google_Transit_stations_Custom+5))
+      DFtoBuildLagsScenario4$Google_Workplaces[breaker:nrow(DFtoBuildLagsScenario4)] <- as.integer(runif(length(breaker:nrow(DFtoBuildLagsScenario4)), min = Google_Workplaces_Custom-5, max = Google_Workplaces_Custom+5))
+      DFtoBuildLagsScenario4$Google_Residential[breaker:nrow(DFtoBuildLagsScenario4)] <- as.integer(runif(length(breaker:nrow(DFtoBuildLagsScenario4)), min = Google_Residential_Custom-5, max = Google_Residential_Custom+5))
+      DFtoBuildLagsScenario4$Social_Distancing[breaker:nrow(DFtoBuildLagsScenario4)] <- Social_Distancing_Custom
+      DFtoBuildLagsScenario4$Quaranting_Cases[breaker:nrow(DFtoBuildLagsScenario4)] <- Quaranting_Cases_Custom
+      DFtoBuildLagsScenario4$Close_Border[breaker:nrow(DFtoBuildLagsScenario4)] <- Close_Border_Custom
+  
+      if(scenario == 1){DFtoBuildLagsScenarioChosen <- DFtoBuildLagsScenario1}
+      if(scenario == 2){DFtoBuildLagsScenarioChosen <- DFtoBuildLagsScenario2}
+      if(scenario == 3){DFtoBuildLagsScenarioChosen <- DFtoBuildLagsScenario3}
+      if(scenario == 4){DFtoBuildLagsScenarioChosen <- DFtoBuildLagsScenario4}
+      for(j in 1:length(NPInamesMain)){
+        testing_ready_pred[breaker:nrow(testing_ready_pred),NPInamesMain[j]] <- DFtoBuildLagsScenarioChosen[breaker:nrow(testing_ready_pred),NPInamesMain[j]]
+      }
+      for(jj in 1:length(NPInamesLag)){
+        myStringSplit <- unlist(strsplit(NPInamesLag[jj],"_"))
+        string1 <- paste(myStringSplit[1:(which(myStringSplit %in% c("Lag","lag"))-1)],sep="",collapse="_")
+        lagtime <- as.numeric(tail(myStringSplit,1))
+        testing_ready_pred[breaker:nrow(testing_ready_pred),NPInamesLag[jj]] <- lag(DFtoBuildLagsScenarioChosen[[paste0(string1)]],lagtime)[breaker:nrow(testing_ready_pred)]
+      }
+  
+      # DFtoBuildLags
+      # if(NPIflag2 == "lastNPI"){
+      #   for(i in breaker:nrow(testing_ready_pred)){
+      #     for(j in NPInames){
+      #       if(is.na(testing_ready_pred[[j]][i])){testing_ready_pred[[j]][i] <- testing_ready_pred[[j]][i-1]}
+      #     }
+      #   }
+      # }else if(NPIflag2 == "firstNPI"){
+      #   for(i in breaker:nrow(testing_ready_pred)){
+      #     for(j in NPInames){testing_ready_pred[[j]][i] <- hindsight_ready[[j]][which.min(hindsight_ready$date)]}
+      #     }
+      # }
+      # Check before and after if you so desire, for the filling in of NPI data in the forecasting period.
+      # testing_ready$Social_Distancing
+      # testing_ready_pred$Social_Distancing
+      
+      NPInames <- names(testing_ready_pred)[grep("R0",names(testing_ready_pred))]
+      testing_ready_pred[breaker:nrow(testing_ready_pred),c(NPInames)] <- NA
+      
+      # testing_ready_pred
+      #---makePrediction---#########################################################################################################################################################################
+      p1 <- predict(best_model, testing_ready_pred[1:(breaker-1),], na.action = na.pass, n.trees = number_trees)
+      # p1_tmp <- predictFunction(name=best_model, mod_name=model_name, dd=testing_ready_pred[1:(breaker-1),], n_trees = number_trees)
+      # p1 <- as.data.frame(cbind(p1_tmp$predictions,p1_tmp$se))
+      # colnames(p1) <- c("prediction","se")
       for(i in breaker:nrow(testing_ready_pred)){
-        for(j in NPInames){
-          if(is.na(testing_ready_pred[[j]][i])){testing_ready_pred[[j]][i] <- testing_ready_pred[[j]][i-1]}
+        for(l in 1:nLags){
+          if(c(paste0("R0_Lag_", l)) %in% colnames(testing_ready_pred)){
+            testing_ready_pred[i,c(paste0("R0_Lag_", l))] <- testing_ready_pred[i-l,c(paste0(outcomeVariable))]
+          }
         }
-      }
-    }
-    # Check before and after if you so desire, for the filling in of NPI data in the forecasting period.
-    # testing_ready$Social_Distancing
-    # testing_ready_pred$Social_Distancing
-    
-    NPInames <- names(testing_ready_pred)[grep("R0",names(testing_ready_pred))]
-    testing_ready_pred[breaker:nrow(testing_ready_pred),c(NPInames)] <- NA
-    
-    # testing_ready_pred
-    #---makePrediction---#########################################################################################################################################################################
-    p1 <- predict(best_model, testing_ready_pred[1:(breaker-1),], na.action = na.pass, n.trees = number_trees)
-    # p1_tmp <- predictFunction(name=best_model, mod_name=model_name, dd=testing_ready_pred[1:(breaker-1),], n_trees = number_trees)
-    # p1 <- as.data.frame(cbind(p1_tmp$predictions,p1_tmp$se))
-    # colnames(p1) <- c("prediction","se")
-    for(i in breaker:nrow(testing_ready_pred)){
-      for(l in 1:nLags){
-        if(c(paste0("R0_Lag_", l)) %in% colnames(testing_ready_pred)){
-          testing_ready_pred[i,c(paste0("R0_Lag_", l))] <- testing_ready_pred[i-l,c(paste0(outcomeVariable))]
+        if(i==breaker){
+          pN <- predictFunction(name=best_model, mod_name=model_name,dd=testing_ready_pred[i,], n_trees = number_trees)
+          pAll <- c(p1,pN)
+        }else{
+          pN <-  predictFunction(name=best_model, mod_name=model_name,dd=testing_ready_pred[i,], n_trees = number_trees)
+          pAll <- c(pAll,pN)
         }
+        testing_ready_pred[i,c(paste0(outcomeVariable))] <- 0
+        testing_ready_pred[i,c(paste0(outcomeVariable))] <- predictFunction(name=best_model, mod_name=model_name,dd=testing_ready_pred[i,], n_trees = number_trees)
+        
       }
-      testing_ready_pred[i,c(paste0(outcomeVariable))] <- 0
-      testing_ready_pred[i,c(paste0(outcomeVariable))] <- predictFunction(name=best_model, mod_name=model_name,dd=testing_ready_pred[i,], n_trees = number_trees)
-      if(i==breaker){
-        pN <- predictFunction(name=best_model, mod_name=model_name,dd=testing_ready_pred[i,], n_trees = number_trees)
-        pAll <- c(p1,pN)
-      }else{
-        pN <-  predictFunction(name=best_model, mod_name=model_name,dd=testing_ready_pred[i,], n_trees = number_trees)
-        pAll <- c(pAll,pN)
+      
+      # Collect the data to be rady for ggplot
+      pAll <- as.data.frame(pAll)
+      pAll$time <- testing_ready$time
+      pAll$date <- testing_ready$date
+      areNA <- which(is.na(pAll$date))
+      for(i in areNA){
+        pAll$date[i] <- pAll$date[i-1]+1
       }
-    }
+      plot1Data_tmp <- testing_ready_OG[,c("FullName","time",outcomeVariable)]
+      
+      #---plotPrediction---#########################################################################################################################################################################
+      # Organize the data to be ready for ggplot
+      plot1Data <- plot1Data_tmp %>% left_join(pAll, by = c("time" = "time"))
+      colnames(plot1Data) <- c("country","time","Subset R0 Timeseries","Prediction","date")
+      plot1Data$time <- NULL
+      plot1Data$date <- testing_ready_OG$date
+      areNA <- which(is.na(plot1Data$date))
+      for(i in areNA){
+        plot1Data$date[i] <- plot1Data$date[i-1]+1
+      }
+      plot1Data <- plot1Data[order(plot1Data$date),]
+      plot1Data$Prediction <- as.numeric(plot1Data$Prediction)
+      plot1Data$`Subset R0 Timeseries` <- as.numeric(plot1Data$`Subset R0 Timeseries`)
+      plot1Data$country <- as.character(plot1Data$country)
+      str(plot1Data)
+  
+      # hindsight <- subset(hindsightAll, ISO3 == testing_country)
+      plot1Data <- merge(plot1Data, hindsight_ready[,c("date",outcomeVariable)], by="date", all.x=T, all.y=T)
+      colnames(plot1Data) <- c("date", "country", "Subset R0 Timeseries", "Prediction", "Hindsight R0 Timeseries")
+      
+      if(scenario==1){
+        colnames(plot1Data) <- c("date", "country", "Subset R0 Timeseries", "Status Quo Prediction", "Hindsight R0 Timeseries")
+        plot1DataScenario1 <- plot1Data
+      }
+      if(scenario==2){
+        colnames(plot1Data) <- c("date", "country", "Subset R0 Timeseries", "Pre-COVID-NPI Prediction", "Hindsight R0 Timeseries")
+        plot1DataScenario2 <- plot1Data
+      }
+      if(scenario==3){
+        colnames(plot1Data) <- c("date", "country", "Subset R0 Timeseries", "Extreme-NPI Prediction", "Hindsight R0 Timeseries")
+        plot1DataScenario3 <- plot1Data
+      }
+      if(scenario==4){
+        colnames(plot1Data) <- c("date", "country", "Subset R0 Timeseries", "Custom-NPI Prediction", "Hindsight R0 Timeseries")
+        plot1DataScenario4 <- plot1Data
+      }
     
-    # Collect the data to be rady for ggplot
-    pAll <- as.data.frame(pAll)
-    pAll$time <- testing_ready$time
-    pAll$date <- testing_ready$date
-    areNA <- which(is.na(pAll$date))
-    for(i in areNA){
-      pAll$date[i] <- pAll$date[i-1]+1
     }
-    plot1Data_tmp <- testing_ready_OG[,c("FullName","time",outcomeVariable)]
-    
-    #---plotPrediction---#########################################################################################################################################################################
-    # Organize the data to be ready for ggplot
-    plot1Data <- plot1Data_tmp %>% left_join(pAll, by = c("time" = "time"))
-    colnames(plot1Data) <- c("country","time","Actual","Prediction","date")
-    plot1Data$time <- NULL
-    plot1Data$date <- testing_ready_OG$date
-    areNA <- which(is.na(plot1Data$date))
-    for(i in areNA){
-      plot1Data$date[i] <- plot1Data$date[i-1]+1
-    }
-    plot1Data <- plot1Data[order(plot1Data$date),]
-    plot1Data$Prediction <- as.numeric(plot1Data$Prediction)
-    plot1Data$Actual <- as.numeric(plot1Data$Actual)
-    plot1Data$country <- as.character(plot1Data$country)
-    str(plot1Data)
-    hindsightAll <- read.csv("./InputData/ML_features.csv")
-    hindsightAll$date <- as.Date(hindsightAll$date)
-    for(i in 1:1){
-      hindsight_subset <- subset(hindsightAll,ISO3 == testing_country)
-      if(incidence_flag==T & death_flag == F){
-        start <- which(hindsight_subset$confirmed_cum_per_million >= incidence_start_point)[1]
-      }else if(incidence_flag==T & death_flag == T){
-        start <- which(hindsight_subset$death_cum_per_million >= incidence_start_point)[1]
-      }else if(incidence_flag==F & death_flag == F){
-        start <- which(hindsight_subset$confirmed_cum >= count_start_point)[1]
-      }else if(incidence_flag==F & death_flag == T){
-        start <- which(hindsight_subset$death_cum >= count_start_point)[1]
-      }
-      hindsight_subset_aligned <- hindsight_subset[start:nrow(hindsight_subset),]
-      
-      # Smooth out incidence using moving average with a centered window of 7 datapoints (3 to the left, 3 to the right)
-      # make sure the window is an odd integer
-      window <- 7
-      # dim(hindsight_subset_aligned)
-      # length(rollmean(hindsight_subset_aligned$confirmed, k=window))
-      hindsight_subset_aligned$movingAverage <- c(hindsight_subset_aligned$confirmed[1:((window-1)/2)],rollmean(hindsight_subset_aligned$confirmed, k=window, align = "center"),hindsight_subset_aligned$confirmed[(nrow(hindsight_subset_aligned)-((window-1)/2)+1):nrow(hindsight_subset_aligned)])
-      # Plot cases
-      gg <- ggplot(hindsight_subset_aligned) +
-        geom_line(aes(x=date, y=confirmed),color="red") +
-        geom_line(aes(x=date, y=movingAverage),color="blue") +
-        ggtitle(paste0("Reported cases in ", testing_country))
-      print(gg)
-      # Add moving average day lag and one day difference variables
-      hindsight_subset_aligned[["movingAverage_Lag_1"]] <- lag(hindsight_subset_aligned[["movingAverage"]],1)
-      hindsight_subset_aligned[["movingAverage_Lag_3"]] <- lag(hindsight_subset_aligned[["movingAverage"]],3)
-      hindsight_subset_aligned[["movingAverage_Lag_7"]] <- lag(hindsight_subset_aligned[["movingAverage"]],7)
-      hindsight_subset_aligned[["movingAverage_Lag_14"]] <- lag(hindsight_subset_aligned[["movingAverage"]],14)
-      hindsight_subset_aligned[["movingAverage_diff_1_3"]] <- hindsight_subset_aligned[["movingAverage_Lag_1"]] - hindsight_subset_aligned[["movingAverage_Lag_3"]]
-      hindsight_subset_aligned[["movingAverage_diff_1_7"]] <- hindsight_subset_aligned[["movingAverage_Lag_1"]] - hindsight_subset_aligned[["movingAverage_Lag_7"]]
-      hindsight_subset_aligned[["movingAverage_diff_1_14"]] <- hindsight_subset_aligned[["movingAverage_Lag_1"]] - hindsight_subset_aligned[["movingAverage_Lag_14"]]
-      hindsight_subset_aligned[["movingAverage_diff_3_7"]] <- hindsight_subset_aligned[["movingAverage_Lag_3"]] - hindsight_subset_aligned[["movingAverage_Lag_7"]]
-      hindsight_subset_aligned[["movingAverage_diff_7_14"]] <- hindsight_subset_aligned[["movingAverage_Lag_7"]] - hindsight_subset_aligned[["movingAverage_Lag_14"]]
-      
-      # toCalcR0 <- hindsight_subset_aligned[,c("date","confirmed")]
-      toCalcR0 <- hindsight_subset_aligned[,c("date","movingAverage")]
-      colnames(toCalcR0) <- c("dates","I")
-      toCalcR0$I[toCalcR0$I<0] <- NA
-      #Get of erroneous negative counts... they sneak throught the API sometimes. 
-      # But if thre is a negative at teh end... are the last one lets just make it equal to the n-1 one
-      if(is.na(tail(toCalcR0$I,1))){
-        toCalcR0$I[length(toCalcR0$I)] <- toCalcR0$I[length(toCalcR0$I)-1]
-      }
-      # If the NA is not at the end, Lets linearly interpolate them:
-      toCalcR0$I <- na.approx(toCalcR0$I)
-      res_uncertain_si <- estimate_R(toCalcR0,
-                                     method = "uncertain_si",
-                                     config = config)
-      hindsight_subset_aligned$R0 <- NA 
-      hindsight_subset_aligned$R0[head(res_uncertain_si[["R"]]$`t_start`,1):tail(res_uncertain_si[["R"]]$`t_start`,1)] <- res_uncertain_si[["R"]]$`Mean(R)`
-      # Autofill beginning R0s with first value
-      hindsight_subset_aligned$R0[1:head(res_uncertain_si[["R"]]$`t_start`,1)] <- mean(head(res_uncertain_si[["R"]]$`Mean(R)`,5))
-      # Autofill ending R0s with last value
-      hindsight_subset_aligned$R0[tail(res_uncertain_si[["R"]]$`t_start`,1):nrow(hindsight_subset_aligned)] <- mean(tail(res_uncertain_si[["R"]]$`Mean(R)`,5))
-      listToLag <- c("R0","Google_Retail_recreation","Google_Grocery_pharmacy","Google_Parks","Google_Transit_stations","Google_Workplaces","Google_Residential")
-      for(npi in 1:length(listToLag)){
-        # Add 3 day lag factor for R0
-        hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_3")]] <- lag(hindsight_subset_aligned[[paste0(listToLag[npi])]],3)
-        hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_3")]][1:3] <- hindsight_subset_aligned[[paste0(listToLag[npi])]][1]
-        # Add 7 day lag factor for R0
-        hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_7")]] <- lag(hindsight_subset_aligned[[paste0(listToLag[npi])]],7)
-        hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_7")]][1:7] <- hindsight_subset_aligned[[paste0(listToLag[npi])]][1]
-        # Add 14 day lag factor for R0
-        # if(timeChop > "2020-04-10"){
-        hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]] <- lag(hindsight_subset_aligned[[paste0(listToLag[npi])]],14)
-        hindsight_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]][1:14] <- hindsight_subset_aligned[[paste0(listToLag[npi])]][1]
-        # }
-      }
-      plot.new()
-      plot(res_uncertain_si, legend = T)
-      mtext(testing_country, outer=TRUE,  cex=1, line=-.5)
-      
-      tmp <- hindsight_subset_aligned[1:forecastingTime,]
-      tmp[,grep("cum|Social_Distancing|Quaranting_Cases|Close_Border|Google|R0|date|confirmed", colnames(tmp))] <- NA
-      tmp$Social_Distancing <- NA
-      tmp$Quaranting_Cases <- NA
-      tmp$Close_Border <- NA
-      hindsight_subset_aligned_predictNA <- rbind(hindsight_subset_aligned,tmp)
-      hindsight_subset_aligned_predictNA$time <- c(1:nrow(hindsight_subset_aligned_predictNA))
-      
-      if(i==1){
-        hindsight_ready <- hindsight_subset_aligned_predictNA
-      }else{
-        hindsight_ready <- as.data.frame(rbind(hindsight_ready,hindsight_subset_aligned_predictNA))
-      }
-    }
-    # hindsight <- subset(hindsightAll, ISO3 == testing_country)
-    plot1Data <- merge(plot1Data, hindsight_ready[,c("date",outcomeVariable)], by="date", all.x=T, all.y=T)
-    colnames(plot1Data) <- c("date", "country", "Actual", "Prediction", "Hindsight")
-    
+    plot1Data <- cbind(plot1DataScenario1,plot1DataScenario2$`Pre-COVID-NPI Prediction`,plot1DataScenario3$`Extreme-NPI Prediction`,plot1DataScenario4$`Custom-NPI Prediction`)
+    colnames(plot1Data) <- c("date", "country", "Subset R0 Timeseries", "Status Quo Prediction", "Hindsight R0 Timeseries", "Pre-COVID-NPI Prediction", "Extreme-NPI Prediction", "Custom-NPI Prediction")
     # Reshape the data to be ready for ggplot
     m1 <- reshape2::melt(plot1Data,id=c("country","date"))
     m1$date <- as.numeric(m1$date)
@@ -853,37 +1011,48 @@ for(cc in 1:length(testing_countriesList)){
     
     # Set the colors for red = actual, blue = prediction
     m1$date <- as.Date(m1$date)
-    predictColor <- rep("deepskyblue2",3)
-    alphabeticalList <- sort(c("Predict","Actual","Hindsight"))
-    alphabeticalIndex <- which(alphabeticalList == "Actual")
+    predictColor <- rep("deepskyblue2",6)
+    alphabeticalList <- sort(c("Status Quo Prediction","Pre-COVID-NPI Prediction","Extreme-NPI Prediction","Subset R0 Timeseries","Hindsight R0 Timeseries","Custom-NPI Prediction"))
+    alphabeticalIndex <- which(alphabeticalList == "Subset R0 Timeseries")
     predictColor[alphabeticalIndex] <- "red"
-    alphabeticalIndex <- which(alphabeticalList == "Hindsight")
+    alphabeticalIndex <- which(alphabeticalList == "Hindsight R0 Timeseries")
     predictColor[alphabeticalIndex] <- "orange"
+    alphabeticalIndex <- which(alphabeticalList == "Status Quo Prediction")
+    predictColor[alphabeticalIndex] <- "deepskyblue2"
+    alphabeticalIndex <- which(alphabeticalList == "Pre-COVID-NPI Prediction")
+    predictColor[alphabeticalIndex] <- "purple"
+    alphabeticalIndex <- which(alphabeticalList == "Extreme-NPI Prediction")
+    predictColor[alphabeticalIndex] <- "seagreen"
+    alphabeticalIndex <- which(alphabeticalList == "Custom-NPI Prediction")
+    predictColor[alphabeticalIndex] <- "darkblue"
     
     # make the plot
     plot_predict <- ggplot() 
-    plot_predict <- subset(m1, variable == "Actual") %>%
+    plot_predict <- subset(m1, variable == "Subset R0 Timeseries") %>%
       ggplot(aes(x = date, y = value, color = variable))+
       geom_glowing_line()
     plot_predict <- plot_predict +
-      geom_line(data=subset(m1, variable == "Hindsight"), aes(x = date, y = value, group = variable, color = variable), size=1.5,alpha=.9,show.legend = T,linetype = "solid")
+      geom_line(data=subset(m1, variable == "Hindsight R0 Timeseries"), aes(x = date, y = value*1, group = variable, color = variable), size=1.5,alpha=.9,show.legend = T,linetype = "solid")
     plot_predict <- plot_predict +
-      geom_line(data=subset(m1, variable == "Prediction"), aes(x = date, y = value, group = variable, color = variable), size=1.5,alpha=.95,show.legend = T,linetype = "solid")
-    if(incidence_flag==T && death_flag==F){
-      plot_predict <- plot_predict +
-        labs(x=paste0("Days Since ",incidence_start_point," Cumulative Counts per Million"), y = "Confirmed Cumulative Cases per Million", title="")
-    }else if(incidence_flag==T && death_flag==T){
-      plot_predict <- plot_predict +
-        labs(x=paste0("Days Since ",incidence_start_point," Cumulative per Million"), y = "Confirmed Cumulative Deaths per Million", title="")
-    }else if(incidence_flag==F && death_flag==F){
-      plot_predict <- plot_predict +
-        labs(x=paste0("Days Since ",count_start_point," Cumulative Counts"), y = "Confirmed Cumulative Cases", title="")
-    }else if(incidence_flag==F && death_flag==T){
-      plot_predict <- plot_predict +
-        labs(x=paste0("Days Since ",count_start_point," Cumulative Deaths"), y = "Confirmed Cumulative Deaths", title="")
-    }
+      geom_line(data=subset(m1, variable == "Status Quo Prediction"), aes(x = date, y = value*0.99, group = variable, color = variable), size=1.2,alpha=.9,show.legend = T,linetype = "solid")
+    plot_predict <- plot_predict +
+    geom_line(data=subset(m1, variable == "Pre-COVID-NPI Prediction"), aes(x = date, y = value*1.01, group = variable, color = variable), size=1.2,alpha=.9,show.legend = T,linetype = "solid")
+    plot_predict <- plot_predict +
+      geom_line(data=subset(m1, variable == "Extreme-NPI Prediction"), aes(x = date, y = value*0.98, group = variable, color = variable), size=1.2,alpha=.9,show.legend = T,linetype = "solid")
+    plot_predict <- plot_predict +
+      geom_line(data=subset(m1, variable == "Custom-NPI Prediction"), aes(x = date, y = value*1, group = variable, color = variable), size=1.2,alpha=.9,show.legend = T,linetype = "solid")
+    plot_predict <- plot_predict +
+      labs(y = "R0", title="")
     plot_predict <- plot_predict +
       guides(color=guide_legend(title="")) +
+      geom_vline(xintercept=pAll$date[breaker], linetype="dashed", 
+                 color = "tomato4", size=1.5)+
+      geom_text(aes(x=pAll$date[breaker-2], label=as.character(format.Date(pAll$date[breaker],"%b-%d-%Y")), y=0.93*max(m1$value,na.rm=T)), colour="tomato4", angle=90, text=element_text(size=12)) +
+      # scale_x_date(breaks = seq(from=min(m1$date,na.rm=T),to=max(m1$date,na.rm=T),length.out=5), labels = date_format("%d"))+
+      scale_x_date(date_breaks = "2 week", date_labels =  "%b %d") +
+      theme(axis.text.x=element_text(angle=60, hjust=1))+
+      geom_hline(yintercept=1, linetype="dashed", 
+                 color = "darkgrey", size=1.5)+
       theme(legend.title=element_text(size=14))+
       theme(axis.text.x = element_text(color="black",size = 13, angle = 0, hjust = .5, vjust = .5),
             axis.text.y = element_text(color="black",size = 13, angle = 0),
@@ -896,7 +1065,7 @@ for(cc in 1:length(testing_countriesList)){
       theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
             panel.background = element_blank(), axis.line = element_line(colour = "black"))+
       labs(x=NULL)
-    
+    # plot_predict
     #---All Country plot---#########################################################################################################################################################################
     # lineColors <- c("firebrick","darkgoldenrod1", "darkviolet", "limegreen", "dodgerblue")
     colorList <- c(randomColor(length(training_countries)+1))
@@ -1038,6 +1207,8 @@ for(cc in 1:length(testing_countriesList)){
     plot2 <- plot2 +
       ylim(c(0,7))+
       guides(color=guide_legend(title="")) +
+      geom_hline(yintercept=1, linetype="dashed", 
+                 color = "darkgrey", size=2)+
       theme(legend.title=element_text(size=14))+
       theme(axis.text.x = element_text(color="black",size = 13, angle = 0, hjust = .5, vjust = .5),
             axis.text.y = element_text(color="black",size = 13, angle = 0),
@@ -1056,7 +1227,7 @@ for(cc in 1:length(testing_countriesList)){
     # qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
     # col_vector = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
     # myCols <- sample(col_vector, n)
-    myCols <- c("#d1c700","#66A61E","#e61247","deepskyblue","brown3","purple")
+    myCols <- c("#d1c700","#66A61E","orangered","deepskyblue","red4","purple")
     # pie(rep(1,n), col=myCols)
     
     plot34Data <- testing_ready_OG[1:(nrow(testing_ready_OG)-forecastingTime),c("date","R0","Social_Distancing","Quaranting_Cases","Close_Border","Google_Grocery_pharmacy","Google_Parks","Google_Residential","Google_Retail_recreation","Google_Transit_stations","Google_Workplaces")]
@@ -1084,7 +1255,8 @@ for(cc in 1:length(testing_countriesList)){
       labs(x=paste0("Days Since ",incidence_start_point," Cumulative Counts per Million"), y = "% Change From Baseline", title="")
     plot3 <- plot3 +
       guides(color=guide_legend(title="")) +
-      theme(legend.position="top") +
+      theme(legend.position="top") +      
+      geom_hline(yintercept=0, linetype="dashed", color = "darkgrey", size=1)+
       theme(legend.title=element_text(size=14))+
       theme(axis.text.x = element_text(color="black",size = 13, angle = 0, hjust = .5, vjust = .5),
             axis.text.y = element_text(color="black",size = 13, angle = 0),
@@ -1203,17 +1375,17 @@ for(cc in 1:length(testing_countriesList)){
     
     #---cumulativePlot---#########################################################################################################################################################################
     rmsedf <- plot1Data[(breakpoint+1):(nrow(plot1Data)-forecastingTime),]
-    rmse_val <- sqrt( sum( (rmsedf$Prediction - rmsedf$Hindsight)^2 ,na.rm = T) / (length(rmsedf$Prediction[!is.na(rmsedf$Prediction)])) )
+    rmse_val <- sqrt( sum( (rmsedf$`Status Quo Prediction` - rmsedf$`Hindsight R0 Timeseries`)^2 ,na.rm = T) / (length(rmsedf$`Status Quo Prediction`[!is.na(rmsedf$`Status Quo Prediction`)])) )
     rmse_val <- round(rmse_val,3)
     gl <- list(plot1,plot2,plot_predict,plot_varimp,plot3,plot4,plot5)
-    dateName <- as.character(timeChop)
-    pdf(paste0("./Output_R0/finalPlot_",testing_country,"_",dateName,"_R0.pdf"),width = 24, height = 24)
+    dateName <- format(as.Date(timeChop), "%Y-%m-%d")
+    pdf(paste0("./Output_R0/finalPlot_",testing_country,"_",dateName,"_R0_",NPIflag2,".pdf"),width = 24, height = 24)
     grid.arrange(grobs = gl, 
                  top = textGrob(paste0(testing_ready$FullName[1],
                                        " ",
-                                       "data through ",
+                                       "Data Through ",
                                        dateName,
-                                       " Hindsight RMSE = ",
+                                       ", Hindsight R0 Timeseries -vs- Status Quo Prediction RMSE = ",
                                        rmse_val),
                                 gp=gpar(fontsize=20)), 
                  layout_matrix = rbind( c(1,1,1,1,1,4,4,4),
@@ -1221,14 +1393,14 @@ for(cc in 1:length(testing_countriesList)){
                                         c(1,1,1,1,1,4,4,4),
                                         c(1,1,1,1,1,4,4,4),
                                         c(1,1,1,1,1,4,4,4),
+                                        c(2,2,2,2,NA,4,4,4),
+                                        c(2,2,2,2,NA,4,4,4),
                                         c(2,2,2,2,5,5,5,5),
                                         c(2,2,2,2,5,5,5,5),
                                         c(2,2,2,2,5,5,5,5),
-                                        c(2,2,2,2,5,5,5,5),
-                                        c(2,2,2,2,6,6,6,6),
                                         c(3,3,3,3,6,6,6,6),
                                         c(3,3,3,3,6,6,6,6),
-                                        c(3,3,3,3,7,7,7,7),
+                                        c(3,3,3,3,6,6,6,6),
                                         c(3,3,3,3,7,7,7,7),
                                         c(3,3,3,3,7,7,7,7)))
     dev.off()
@@ -1239,7 +1411,7 @@ for(cc in 1:length(testing_countriesList)){
     #---Output variables for RShiny App---#########################################################################################################################################################################
     
     # Saving on object in RData format
-    save(plot1, plot_predict, plot2, plot3, plot4, best_model,  file = paste0("./COVID-19_Shiny_Web_App/Inputs/",testing_country,"_",dateName, "_CaseIncidence_Data_R0.RData") )
+    save(plot1, plot_predict, plot2, plot3, plot4, best_model,  file = paste0("./COVID-19_Shiny_Web_App/Inputs/",testing_country,"_",dateName,"_R0_",NPIflag2,".RData") )
     
     
     # }

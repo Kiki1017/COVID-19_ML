@@ -490,7 +490,7 @@ NPIplotAnimation <- function(myNPI = npiList[1], myDate = as.Date("2020-03-28"),
 library(animation)
 library(magick)
 # d_dRange <- as.Date(c(as.Date(min(both$date,na.rm=T)):as.Date(max(both$date,na.rm=T))))
-d_dRange <- as.Date(c(as.Date("2020-02-15"):as.Date("2020-05-03")))
+d_dRange <- as.Date(c(as.Date("2020-02-15"):as.Date("2020-05-12")))
 # d_dRange <- as.Date(c(as.Date("2020-03-15"):as.Date("2020-03-30")))
 
 # d_dRange <- seq(from=as.Date("2020-04-05"), to=as.Date("2020-04-13"), length.out = 8)
@@ -534,8 +534,11 @@ xxList <- c("R0",
                "Quarantining Cases Scale", 
                "Restricting the Border Scale")
 
-# for(n_n in 1:length(npiList)){
-for(n_n in 2:3){
+intervalList <- rep(0.2,length(d_dRange))
+intervalList[length(d_dRange)] <- 1.4
+
+for(n_n in 1:length(npiList)){
+# for(n_n in 2:2){
   print(n_n)
   print(npiList[n_n])
   if(n_n <=9){
@@ -543,17 +546,17 @@ for(n_n in 2:3){
       saveGIF({
         for (d_d in 1:length(d_dRange)){
           NPIplotAnimation(myNPI = npiList[n_n], myDate = d_dRange[d_d], title = titleList[n_n], xx = xxList[n_n], both = both_sub_noUSA, windowSide = 7)}
-      }, interval = .2, movie.name=paste0("noUSA_",npiList[n_n],".gif"), ani.width = 700, ani.height = 1350, ani.res = 100)
+      }, interval = intervalList, movie.name=paste0("noUSA_",npiList[n_n],".gif"), ani.width = 700, ani.height = 1350, ani.res = 100)
     }
     saveGIF({
       for (d_d in 1:length(d_dRange)){
         NPIplotAnimation(myNPI = npiList[n_n], myDate = d_dRange[d_d], title = titleList[n_n], xx = xxList[n_n], both = both, windowSide = 7)}
-    }, interval = .2, movie.name=paste0(npiList[n_n],".gif"), ani.width = 700, ani.height = 1350, ani.res = 100)
+    }, interval = intervalList, movie.name=paste0(npiList[n_n],".gif"), ani.width = 700, ani.height = 1350, ani.res = 100)
   }else{
     saveGIF({
       for (d_d in 1:length(d_dRange)){
         NPIplotAnimation(myNPI = npiList[n_n], myDate = d_dRange[d_d], title = titleList[n_n], xx = xxList[n_n], both = both_sub, windowSide = 7)}
-    }, interval = .2, movie.name=paste0(npiList[n_n],".gif"), ani.width = 700, ani.height = 900, ani.res = 100)
+    }, interval = intervalList, movie.name=paste0(npiList[n_n],".gif"), ani.width = 700, ani.height = 900, ani.res = 100)
   }
 
   closeAllConnections()

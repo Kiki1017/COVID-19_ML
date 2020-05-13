@@ -39,7 +39,7 @@ if(death_flag==T){
   incidence_start_point <- incidence_start_point*(5.9/100)
   count_start_point <- count_start_point*(5.9/100)
 }
-
+VSURFflag <- F
 # the number of lag factors you want
 nLags <- 14
 # the time you want to forecast the predictiont
@@ -62,7 +62,8 @@ number_trees = 1000
 # read in raw data
 
 # testing_countriesList <- c("USA","BRA","GBR","ZAF","BEL","DZA")
-testing_countriesList <- c("USA")  
+# testing_countriesList <- c("USA")  
+testing_countriesList <- c("USA","ITA","KOR","BRA","ZAF","ISR","SWE","SGP")
 for(cc in 1:length(testing_countriesList)){
 # cc=1
   
@@ -91,8 +92,8 @@ for(cc in 1:length(testing_countriesList)){
   print(D3)
   print(D4)
   
-  for(timeChop in c(D4,D3,D2,D1)){
-  # for(timeChop in c(D4)){
+  # for(timeChop in c(D4,D3,D2,D1)){
+  for(timeChop in c(D4)){
   data_clean <- read.csv("./InputData/ML_features.csv")
   data_clean$date <- as.Date(data_clean$date)
   data_clean <- subset(data_clean, date <= timeChop)
@@ -249,20 +250,31 @@ for(cc in 1:length(testing_countriesList)){
     training_subset_aligned$R0[head(res_uncertain_si[["R"]]$`t_start`,1):tail(res_uncertain_si[["R"]]$`t_start`,1)] <- res_uncertain_si[["R"]]$`Mean(R)`
     # Autofill beginning R0s with first value
     training_subset_aligned$R0[1:head(res_uncertain_si[["R"]]$`t_start`,1)] <- mean(head(res_uncertain_si[["R"]]$`Mean(R)`,5))
-    # Autofill ending R0s with last value
-    training_subset_aligned$R0[tail(res_uncertain_si[["R"]]$`t_start`,1):nrow(training_subset_aligned)] <- mean(tail(res_uncertain_si[["R"]]$`Mean(R)`,5))
+    # Autofill ending R0s with linear estimation from last week of values
+    fitFrame <- as.data.frame(cbind(c(1:7),tail(res_uncertain_si[["R"]]$`Mean(R)`,7)))
+    fit <- lm(V2~V1, data=fitFrame)
+    fitPred <- as.data.frame(8:(8+length(tail(res_uncertain_si[["R"]]$`t_start`,1):nrow(training_subset_aligned)))); colnames(fitPred) <- c("V1")
+    training_subset_aligned$R0[tail(res_uncertain_si[["R"]]$`t_start`,1):nrow(training_subset_aligned)] <- predict.lm(fit,fitPred) #mean(tail(res_uncertain_si[["R"]]$`Mean(R)`,5))
     listToLag <- c("R0","Google_Retail_recreation","Google_Grocery_pharmacy","Google_Parks","Google_Transit_stations","Google_Workplaces","Google_Residential")
     for(npi in 1:length(listToLag)){
+      # Add 1 day lag factor for R0
+      training_subset_aligned[[paste0(listToLag[npi],"_Lag_1")]] <- lag(training_subset_aligned[[paste0(listToLag[npi])]],1)
+      training_subset_aligned[[paste0(listToLag[npi],"_Lag_1")]][1:1] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:1])
       # Add 3 day lag factor for R0
       training_subset_aligned[[paste0(listToLag[npi],"_Lag_3")]] <- lag(training_subset_aligned[[paste0(listToLag[npi])]],3)
-      training_subset_aligned[[paste0(listToLag[npi],"_Lag_3")]][1:3] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:5])
+      training_subset_aligned[[paste0(listToLag[npi],"_Lag_3")]][1:3] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:3])
+      # Add 5 day lag factor for R0
+      training_subset_aligned[[paste0(listToLag[npi],"_Lag_5")]] <- lag(training_subset_aligned[[paste0(listToLag[npi])]],5)
+      training_subset_aligned[[paste0(listToLag[npi],"_Lag_5")]][1:5] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:5])
       # Add 7 day lag factor for R0
       training_subset_aligned[[paste0(listToLag[npi],"_Lag_7")]] <- lag(training_subset_aligned[[paste0(listToLag[npi])]],7)
-      training_subset_aligned[[paste0(listToLag[npi],"_Lag_7")]][1:7] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:5])
+      training_subset_aligned[[paste0(listToLag[npi],"_Lag_7")]][1:7] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:7])
+      # Add 10 day lag factor for R0
+      training_subset_aligned[[paste0(listToLag[npi],"_Lag_10")]] <- lag(training_subset_aligned[[paste0(listToLag[npi])]],10)
+      training_subset_aligned[[paste0(listToLag[npi],"_Lag_10")]][1:10] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:10])
       # Add 14 day lag factor for R0
-      # if(timeChop > "2020-04-10"){
-        training_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]] <- lag(training_subset_aligned[[paste0(listToLag[npi])]],14)
-        training_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]][1:14] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:5])
+      training_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]] <- lag(training_subset_aligned[[paste0(listToLag[npi])]],14)
+      training_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]][1:14] <- mean(training_subset_aligned[[paste0(listToLag[npi])]][1:14])
       # }
     }
     
@@ -331,20 +343,31 @@ for(cc in 1:length(testing_countriesList)){
     testing_subset_aligned$R0[head(res_uncertain_si[["R"]]$`t_start`,1):tail(res_uncertain_si[["R"]]$`t_start`,1)] <- res_uncertain_si[["R"]]$`Mean(R)`
     # Autofill beginning R0s with first value
     testing_subset_aligned$R0[1:head(res_uncertain_si[["R"]]$`t_start`,1)] <- mean(head(res_uncertain_si[["R"]]$`Mean(R)`,5))
-    # Autofill ending R0s with last value
-    testing_subset_aligned$R0[tail(res_uncertain_si[["R"]]$`t_start`,1):nrow(testing_subset_aligned)] <- mean(tail(res_uncertain_si[["R"]]$`Mean(R)`,5))
+    # Autofill ending R0s with linear estimation from last week of values
+    fitFrame <- as.data.frame(cbind(c(1:7),tail(res_uncertain_si[["R"]]$`Mean(R)`,7)))
+    fit <- lm(V2~V1, data=fitFrame)
+    fitPred <- as.data.frame(8:(8+length(tail(res_uncertain_si[["R"]]$`t_start`,1):nrow(testing_subset_aligned)))); colnames(fitPred) <- c("V1")
+    testing_subset_aligned$R0[tail(res_uncertain_si[["R"]]$`t_start`,1):nrow(testing_subset_aligned)] <- predict.lm(fit,fitPred) #mean(tail(res_uncertain_si[["R"]]$`Mean(R)`,5))
     listToLag <- c("R0","Google_Retail_recreation","Google_Grocery_pharmacy","Google_Parks","Google_Transit_stations","Google_Workplaces","Google_Residential")
     for(npi in 1:length(listToLag)){
+      # Add 1 day lag factor for R0
+      testing_subset_aligned[[paste0(listToLag[npi],"_Lag_1")]] <- lag(testing_subset_aligned[[paste0(listToLag[npi])]],1)
+      testing_subset_aligned[[paste0(listToLag[npi],"_Lag_1")]][1:1] <- mean(testing_subset_aligned[[paste0(listToLag[npi])]][1:1])
       # Add 3 day lag factor for R0
       testing_subset_aligned[[paste0(listToLag[npi],"_Lag_3")]] <- lag(testing_subset_aligned[[paste0(listToLag[npi])]],3)
-      testing_subset_aligned[[paste0(listToLag[npi],"_Lag_3")]][1:3] <- testing_subset_aligned[[paste0(listToLag[npi])]][1]
+      testing_subset_aligned[[paste0(listToLag[npi],"_Lag_3")]][1:3] <- mean(testing_subset_aligned[[paste0(listToLag[npi])]][1:3])
+      # Add 5 day lag factor for R0
+      testing_subset_aligned[[paste0(listToLag[npi],"_Lag_5")]] <- lag(testing_subset_aligned[[paste0(listToLag[npi])]],5)
+      testing_subset_aligned[[paste0(listToLag[npi],"_Lag_5")]][1:5] <- mean(testing_subset_aligned[[paste0(listToLag[npi])]][1:5])
       # Add 7 day lag factor for R0
       testing_subset_aligned[[paste0(listToLag[npi],"_Lag_7")]] <- lag(testing_subset_aligned[[paste0(listToLag[npi])]],7)
-      testing_subset_aligned[[paste0(listToLag[npi],"_Lag_7")]][1:7] <- testing_subset_aligned[[paste0(listToLag[npi])]][1]
+      testing_subset_aligned[[paste0(listToLag[npi],"_Lag_7")]][1:7] <- mean(testing_subset_aligned[[paste0(listToLag[npi])]][1:7])
+      # Add 10 day lag factor for R0
+      testing_subset_aligned[[paste0(listToLag[npi],"_Lag_10")]] <- lag(testing_subset_aligned[[paste0(listToLag[npi])]],10)
+      testing_subset_aligned[[paste0(listToLag[npi],"_Lag_10")]][1:10] <- mean(testing_subset_aligned[[paste0(listToLag[npi])]][1:10])
       # Add 14 day lag factor for R0
-      # if(timeChop > "2020-04-10"){
-        testing_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]] <- lag(testing_subset_aligned[[paste0(listToLag[npi])]],14)
-        testing_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]][1:14] <- testing_subset_aligned[[paste0(listToLag[npi])]][1]
+      testing_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]] <- lag(testing_subset_aligned[[paste0(listToLag[npi])]],14)
+      testing_subset_aligned[[paste0(listToLag[npi],"_Lag_14")]][1:14] <- mean(testing_subset_aligned[[paste0(listToLag[npi])]][1:14])
       # }
     }
     plot.new()
@@ -481,7 +504,7 @@ for(cc in 1:length(testing_countriesList)){
   #---VSURF Variable Selection---#########################################################################################################################################################################
   outcomeVariable <- "confirmed_cum_per_million"
   mod_formula <- as.formula(paste(outcomeVariable,"~","."))
-  if(timeChop == D4){
+  if(timeChop == D4 && VSURFflag == T){
     print(paste0('Number of cores being used = ',num_cores, ", of possible ", detectCores()," cores"))
     
     registerDoParallel(num_cores)
