@@ -65,7 +65,7 @@ number_trees = 1000
 
 # testing_countriesList <- c("USA","BRA","GBR","ZAF","BEL","DZA")
 # testing_countriesList <- c("USA","BRA","DEU","SGP")
-testing_countriesList <- c("USA")
+testing_countriesList <- c("DEU")
 for(cc in 1:length(testing_countriesList)){
   # cc=1
   
