@@ -5,8 +5,47 @@ library(lubridate)
 
 
 
-# download.file("https://www.gstatic.com/covid19/mobility/Global_Mobility_Report.csv","./InputData/Global_Mobility_Report.csv")
+download.file("https://www.gstatic.com/covid19/mobility/Global_Mobility_Report.csv","./InputData/Global_Mobility_Report.csv")
 GoogData <- read.csv("./InputData/Global_Mobility_Report.csv", header=T)
+GoogData <- subset(GoogData, sub_region_1 == "Colorado" & sub_region_2 == "")
+GoogData <- GoogData[,5:ncol(GoogData)]
+library(reshape2)
+plott <- melt(GoogData,id="date")
+plott$date <- as.Date(plott$date)
+plott$variable <- as.factor(plott$variable)
+plott$value <- as.numeric(plott$value)
+ggplot(plott)+
+  geom_line(aes(x=date, y=value, color=variable))+
+  scale_color_manual(values=c("red","blue","green","black","brown","orange"))+
+  ylim(-100,100)
+###
+GoogData <- read.csv("./InputData/Global_Mobility_Report.csv", header=T)
+GoogData <- subset(GoogData, sub_region_1 == "Colorado" & sub_region_2 == "Boulder County")
+GoogData <- GoogData[,5:ncol(GoogData)]
+library(reshape2)
+plott <- melt(GoogData,id="date")
+plott$date <- as.Date(plott$date)
+plott$variable <- as.factor(plott$variable)
+plott$value <- as.numeric(plott$value)
+ggplot(plott)+
+  geom_line(aes(x=date, y=value, color=variable))+
+  scale_color_manual(values=c("red","blue","green","black","brown","orange"))+
+  ylim(-100,100)
+###
+GoogData <- read.csv("./InputData/Global_Mobility_Report.csv", header=T)
+GoogData <- subset(GoogData, sub_region_1 == "Colorado" & sub_region_2 == "Denver County")
+GoogData <- GoogData[,5:ncol(GoogData)]
+library(reshape2)
+plott <- melt(GoogData,id="date")
+plott$date <- as.Date(plott$date)
+plott$variable <- as.factor(plott$variable)
+plott$value <- as.numeric(plott$value)
+ggplot(plott)+
+  geom_line(aes(x=date, y=value, color=variable))+
+  scale_color_manual(values=c("red","blue","green","black","brown","orange"))+
+  ylim(-100,100)
+
+
 GoogData <- subset(GoogData, sub_region_1 == "" & sub_region_2 == "")
 GoogData$country_region <- as.character(GoogData$country_region)
 GoogData$country_region[GoogData$country_region=="United States"] <- "US"
