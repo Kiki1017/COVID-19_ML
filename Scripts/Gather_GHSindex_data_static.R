@@ -91,9 +91,9 @@ head(df_FemaleCount_unmelt)
 #check empty so every country matches
 merge_all$FullName[which(merge_all$FullName %ni% unique(df_AgeGroupPercent_unmelt$FullName_Percent))]
 
-merge_all <- merge(merge_all, df_AgeGroupPercent_unmelt, by.x="FullName", by.y="FullName_Percent")
-merge_all <- merge(merge_all, df_MaleCount_unmelt, by.x="FullName", by.y="FullName_MaleCount")
-merge_all <- merge(merge_all, df_FemaleCount_unmelt, by.x="FullName", by.y="FullName_FemaleCount")
+merge_all <- merge(merge_all, df_AgeGroupPercent_unmelt, by.x="FullName", by.y="FullName_Percent", all.x=T, all.y=F)
+merge_all <- merge(merge_all, df_MaleCount_unmelt, by.x="FullName", by.y="FullName_MaleCount", all.x=T, all.y=F)
+merge_all <- merge(merge_all, df_FemaleCount_unmelt, by.x="FullName", by.y="FullName_FemaleCount", all.x=T, all.y=F)
 
 dim(merge_all)
 
@@ -125,7 +125,7 @@ pop_growth <- rbind(pop_growth,c("Syria",NA))
 
 merge_all$FullName[which(merge_all$FullName %ni% unique(pop_growth$FullName))]
 
-merge_all <- merge(merge_all, pop_growth, by.x="FullName", by.y="FullName")
+merge_all <- merge(merge_all, pop_growth, by.x="FullName", by.y="FullName", all.x=T, all.y=F)
 dim(merge_all)
 
 ###########################################################################################################################################
@@ -247,7 +247,7 @@ Urbanization$FullName[Urbanization$FullName=="Saint Vincent and the Grenadines"]
 
 merge_all$FullName[which(merge_all$FullName %ni% unique(Urbanization$FullName))]
 
-merge_all <- merge(merge_all, Urbanization, by.x="FullName", by.y="FullName")
+merge_all <- merge(merge_all, Urbanization, by.x="FullName", by.y="FullName", all.x=T, all.y=F)
 
 
 ###########################################################################################################################################
@@ -386,7 +386,119 @@ for(i in 1:length(merge_all$FullName)){
 # ethnicGroups$FullName[ethnicGroups$FullName=="Saint Vincent and the Grenadines"] <- "St Vincent and The Grenadines"
 # 
 # merge_all$FullName[which(merge_all$FullName %ni% unique(ethnicGroups$FullName))]
+###########################################################################################################################################
+# Tropical Yes/No indicator
+AverageTemp <- read_excel(xlFile, sheet = "AverageTemp", col_names = T)
+colnames(AverageTemp) <- c("FullName","AverageTemp")
 
+merge_all$FullName[which(merge_all$FullName %ni% unique(AverageTemp$FullName))]
+AverageTemp$FullName[which(unique(AverageTemp$FullName) %ni% merge_all$FullName)]
+
+AverageTemp$FullName[AverageTemp$FullName=="Republic of the Congo"] <- "Congo (Brazzaville)"
+AverageTemp$FullName[AverageTemp$FullName=="Democratic Republic of the Congo"] <- "Congo (Democratic Republic)"
+AverageTemp$FullName[AverageTemp$FullName=="Saint Kitts and Nevis"] <- "St Kitts and Nevis"
+AverageTemp$FullName[AverageTemp$FullName=="Ivory Coast"] <- "Côte d'Ivoire"
+AverageTemp$FullName[AverageTemp$FullName=="Cape Verde"] <- "Cabo Verde"
+AverageTemp$FullName[AverageTemp$FullName=="Saint Lucia"] <- "St Lucia"
+AverageTemp$FullName[AverageTemp$FullName=="Eswatini"] <- "eSwatini (Swaziland)"
+AverageTemp$FullName[AverageTemp$FullName=="Kyrgyzstan"] <- "Kyrgyz Republic"
+AverageTemp$FullName[AverageTemp$FullName=="Federated States of Micronesia"] <- "Micronesia"
+AverageTemp$FullName[AverageTemp$FullName=="Saint Vincent and the Grenadines"] <- "St Vincent and The Grenadines"
+
+merge_all$FullName[which(merge_all$FullName %ni% unique(AverageTemp$FullName))]
+AverageTemp$FullName[which(unique(AverageTemp$FullName) %ni% merge_all$FullName)]
+
+merge_all <- merge(merge_all, AverageTemp, by.x="FullName", by.y="FullName", all.x=T, all.y=F)
+###########################################################################################################################################
+# Tropical Yes/No indicator
+tropicalIndicator <- read_excel(xlFile, sheet = "TropicalCountries", col_names = T)
+colnames(tropicalIndicator) <- c("FullName")
+
+merge_all$FullName[which(merge_all$FullName %ni% unique(tropicalIndicator$FullName))]
+tropicalIndicator$FullName[which(unique(tropicalIndicator$FullName) %ni% merge_all$FullName)]
+
+tropicalIndicator$FullName[tropicalIndicator$FullName=="Burma"] <- "Myanmar"
+tropicalIndicator$FullName[tropicalIndicator$FullName=="Congo"] <- "Congo (Brazzaville)"
+tropicalIndicator$FullName[tropicalIndicator$FullName=="Democratic Republic of Congo"] <- "Congo (Democratic Republic)"
+tropicalIndicator$FullName[tropicalIndicator$FullName=="East Timor"] <- "Timor-Leste"
+tropicalIndicator$FullName[tropicalIndicator$FullName=="Ivory Coast"] <- "Côte d'Ivoire"
+tropicalIndicator$FullName[tropicalIndicator$FullName=="Saint Kitts and Nevis"] <- "St Kitts and Nevis"
+tropicalIndicator$FullName[tropicalIndicator$FullName=="Saint Vincent and the Grenadines"] <- "St Vincent and The Grenadines"
+tropicalIndicator$FullName[tropicalIndicator$FullName=="Sao Tome and Principe"] <- "São Tomé and Príncipe"
+tropicalIndicator$FullName[tropicalIndicator$FullName=="Saint Lucia"] <- "St Lucia"
+
+merge_all$FullName[which(merge_all$FullName %ni% unique(tropicalIndicator$FullName))]
+tropicalIndicator$FullName[which(unique(tropicalIndicator$FullName) %ni% merge_all$FullName)]
+
+merge_all$Tropical <- 0
+merge_all$Tropical[merge_all$FullName %in% tropicalIndicator$FullName] <- 1
+summary(as.factor(merge_all$Tropical))
+
+###########################################################################################################################################
+# Latitude
+library(measurements)
+Latitude <- read_excel(xlFile, sheet = "Latitude", col_names = T)
+colnames(Latitude) <- c("FullName","Capital","Lat","Long")
+
+# change the degree symbol to a space
+Latitude$Lat = gsub('°', ' ', Latitude$Lat)
+Latitude$Lat = gsub("'", ' ', Latitude$Lat)
+Latitude$Lat[grep("S",Latitude$Lat)] <- paste0("-",Latitude$Lat[grep("S",Latitude$Lat)])
+Latitude$Lat = gsub(" S", ' ', Latitude$Lat)
+Latitude$Lat = gsub(" N", ' ', Latitude$Lat)
+Latitude$Long = gsub('°', ' ', Latitude$Long)
+Latitude$Long = gsub("'", ' ', Latitude$Long)
+Latitude$Long[grep("W",Latitude$Long)] <- paste0("-",Latitude$Long[grep("W",Latitude$Long)])
+Latitude$Long = gsub(" E", ' ', Latitude$Long)
+Latitude$Long = gsub(" W", ' ', Latitude$Long)
+
+Latitude$Lat
+Latitude$Long
+
+# convert from decimal minutes to decimal degrees
+Latitude$Lat = measurements::conv_unit(Latitude$Lat, from = 'deg_dec_min', to = 'dec_deg')
+Latitude$Long = measurements::conv_unit(Latitude$Long, from = 'deg_dec_min', to = 'dec_deg')
+
+Latitude$Lat
+Latitude$Long
+
+Latitude$FullName[which(unique(Latitude$FullName) %ni% merge_all$FullName)]
+merge_all$FullName[which(merge_all$FullName %ni% unique(Latitude$FullName))]
+
+Latitude$FullName[Latitude$FullName=="Brunei Darussalam"] <- "Brunei"
+Latitude$FullName[Latitude$FullName=="Cape Verde"] <- "Cabo Verde"
+Latitude$FullName[Latitude$FullName=="Congo, Democratic Republic of the"] <- "Congo (Democratic Republic)"
+Latitude$FullName[Latitude$FullName=="Congo"] <- "Congo (Brazzaville)"
+Latitude$FullName[Latitude$FullName=="Democratic Republic of the Congo"] <- "Congo (Democratic Republic)"
+Latitude$FullName[Latitude$FullName=="Swaziland"] <- "eSwatini (Swaziland)"
+Latitude$FullName[Latitude$FullName=="Iran (Islamic Republic of)"] <- "Iran"
+Latitude$FullName[Latitude$FullName=="Kyrgyzstan"] <- "Kyrgyz Republic"
+Latitude$FullName[Latitude$FullName=="Lao People's Democratic Republic"] <- "Laos"
+Latitude$FullName[Latitude$FullName=="Libyan Arab Jamahiriya"] <- "Libya"
+Latitude$FullName[Latitude$FullName=="Micronesia (Federated States of)"] <- "Micronesia"
+Latitude$FullName[Latitude$FullName=="Moldova, Republic of"] <- "Moldova"
+Latitude$FullName[Latitude$FullName=="Sao Tome and Principe"] <- "São Tomé and Príncipe"
+Latitude$FullName[Latitude$FullName=="Russian Federation"] <- "Russia"
+Latitude$FullName[Latitude$FullName=="Republic of Korea"] <- "South Korea"
+Latitude$FullName[Latitude$FullName=="United States of America"] <- "United States"
+Latitude$FullName[Latitude$FullName=="Republic of Korea"] <- "South Korea"
+Latitude$FullName[Latitude$FullName=="Cote d'Ivoire"] <- "Côte d'Ivoire"
+Latitude$FullName[Latitude$FullName=="United Kingdom of Great Britain and Northern Ireland"] <- "United Kingdom"
+Latitude$FullName[Latitude$FullName=="Viet Nam"] <- "Vietnam"
+Latitude$FullName[Latitude$FullName=="Saint Kitts and Nevis"] <- "St Kitts and Nevis"
+Latitude$FullName[Latitude$FullName=="Saint vincent and the Grenadines"] <- "St Vincent and The Grenadines"
+Latitude$FullName[Latitude$FullName=="Saint Lucia"] <- "St Lucia"
+Latitude$FullName[Latitude$FullName=="East Timor"] <- "Timor-Leste"
+Latitude$FullName[Latitude$FullName=="Dominica Republic"] <- "Dominican Republic"
+Latitude$FullName[Latitude$FullName=="Rawanda"] <- "Rwanda"
+Latitude$FullName[Latitude$FullName=="Syrian Arab Republic"] <- "Syria"
+
+Latitude$FullName[which(unique(Latitude$FullName) %ni% merge_all$FullName)]
+merge_all$FullName[which(merge_all$FullName %ni% unique(Latitude$FullName))]
+
+colnames(Latitude) <- c("FullName","Capital","Latitude","Longitude")
+Latitude$Capital <- NULL
+merge_all <- merge(merge_all, Latitude, by.x="FullName", by.y="FullName", all.x=T, all.y=F)
 
 # =======
 if(HubeiFlag == T){

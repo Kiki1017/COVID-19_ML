@@ -233,9 +233,13 @@ data_features2 <- as_tibble(data_features2)
 data_features3 <- left_join(data_features2, GoogData_sub2, by = c("date" = "date", "Country.x" = "country_region"))
 
 # View(data_features3[c("Country.x","date","Google_Grocery_pharmacy","Google_Parks","Google_Residential","Google_Retail_recreation","Google_Transit_stations","Google_Workplaces")])
+data_features3$weekdays <- weekdays(as.Date(data_features3$date))
+data_features3$weekdays[data_features3$weekdays %in% c("Saturday","Sunday")] <- 0
+data_features3$weekdays[data_features3$weekdays %in% c("Friday")] <- 0.5
+data_features3$weekdays[data_features3$weekdays %in% c("Monday", "Tuesday", "Wednesday", "Thursday")] <- 1
+data_features3$weekdays <- as.numeric(data_features3$weekdays)
 
 write.csv(data_features3, "./InputData/ML_features.csv", row.names = F)
-
 
 
 
